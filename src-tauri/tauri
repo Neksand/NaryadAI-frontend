@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+// Shim: Tauri Android gradle plugin runs `node tauri android android-studio-script`
+// with cwd=src-tauri. Node never resolves bare names for the entry point,
+// so this file forwards to the real CLI. Requires npm-installed @tauri-apps/cli
+// in the frontend root (same layout as this repo).
+import { createRequire } from 'node:module';
+
+createRequire(import.meta.url)('../node_modules/@tauri-apps/cli/tauri.js');
