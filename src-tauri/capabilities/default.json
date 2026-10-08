@@ -1,0 +1,7 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/schema.json",
+  "identifier": "default",
+  "description": "НарядAI: чистый WebView, весь доступ — по HTTPS/HTTP к API.",
+  "windows": ["main"],
+  "permissions": []
+}
