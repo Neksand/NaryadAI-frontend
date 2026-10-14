@@ -1,8 +1,13 @@
-import { api } from '../lib/api-client';
+import { api, newUUID } from '../lib/api-client';
 import { NotificationSchema, type AppNotification } from '../types/domain';
 
-export async function listNotifications(unreadOnly = false, limit = 50): Promise<AppNotification[]> {
-  const { data } = await api.get('/notifications', { params: { unread_only: unreadOnly || undefined, limit } });
+export async function listNotifications(
+  unreadOnly = false,
+  limit = 50,
+): Promise<AppNotification[]> {
+  const { data } = await api.get('/notifications', {
+    params: { unread_only: unreadOnly || undefined, limit },
+  });
   // Бэкенд отдаёт {"data": [...], "unread": n}
   const items = Array.isArray(data) ? data : (data.items ?? data.data ?? []);
   return NotificationSchema.array().parse(items);
@@ -16,12 +21,18 @@ export async function markAllRead(): Promise<void> {
   await api.post('/notifications/read-all', {});
 }
 
-export async function analyticsGet(path: string, params: Record<string, string> = {}): Promise<unknown> {
+export async function analyticsGet(
+  path: string,
+  params: Record<string, string> = {},
+): Promise<unknown> {
   const { data } = await api.get(`/analytics/${path}`, { params });
   return data;
 }
 
-export async function catalogList(name: 'sites' | 'teams' | 'equipment' | 'materials' | 'fault-codes', params: Record<string, string> = {}): Promise<unknown[]> {
+export async function catalogList(
+  name: 'sites' | 'teams' | 'equipment' | 'materials' | 'fault-codes',
+  params: Record<string, string> = {},
+): Promise<unknown[]> {
   const { data } = await api.get(`/${name}`, { params });
   // Каталоги-алиасы отдают {"data": [...]}, /dict/* — {"items": [...]}, бывает и голый массив.
   if (Array.isArray(data)) return data;
@@ -30,7 +41,10 @@ export async function catalogList(name: 'sites' | 'teams' | 'equipment' | 'mater
   return [];
 }
 
-export async function dictList(type: string, params: Record<string, string> = {}): Promise<unknown[]> {
+export async function dictList(
+  type: string,
+  params: Record<string, string> = {},
+): Promise<unknown[]> {
   const { data } = await api.get(`/dict/${type}`, { params });
   return Array.isArray(data) ? data : (data.items ?? []);
 }
@@ -59,7 +73,11 @@ export async function resetPin(userId: string, pin: string): Promise<void> {
   await api.post(`/users/${userId}/reset-pin`, { pin });
 }
 
-export async function patchDict(type: string, id: string, body: Record<string, unknown>): Promise<void> {
+export async function patchDict(
+  type: string,
+  id: string,
+  body: Record<string, unknown>,
+): Promise<void> {
   await api.patch(`/dict/${type}/${id}`, body);
 }
 
@@ -71,12 +89,38 @@ export async function unblockUser(userId: string): Promise<void> {
   await api.post(`/users/${userId}/unblock`, {});
 }
 
-export async function exportReport(body: { type: string; format: 'pdf' | 'xlsx'; filters?: Record<string, unknown> }) {
-  const { data } = await api.post('/reports/export', body, { headers: { 'Idempotency-Key': crypto.randomUUID() } });
-  return data as { job_id: string };
+export type ReportType = 'orders' | 'shift' | 'ratings' | 'materials' | 'downtime' | 'dashboard';
+export type ReportFormat = 'pdf' | 'xlsx';
+export type ReportFilters = {
+  from?: string;
+  to?: string;
+  area_id?: string;
+  equipment_id?: string;
+  assignee_id?: string;
+  status?: string;
+  priority?: string;
+  kind?: string;
+};
+export type ReportExportStatus = {
+  job_id: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  url?: string;
+  error?: string;
+  expires_in?: number;
+};
+
+export async function exportReport(body: {
+  type: ReportType;
+  format: ReportFormat;
+  filters?: ReportFilters;
+}) {
+  const { data } = await api.post('/reports/export', body, {
+    headers: { 'Idempotency-Key': newUUID() },
+  });
+  return data as { job_id: string; status: 'queued' | 'processing' };
 }
 
-export async function exportStatus(jobId: string) {
+export async function exportStatus(jobId: string): Promise<ReportExportStatus> {
   const { data } = await api.get(`/reports/export/${jobId}`);
-  return data as { status: string; signed_url?: string; url?: string };
+  return data as ReportExportStatus;
 }

@@ -30,3 +30,8 @@ src-tauri/gen/android/build/
 src-tauri/gen/android/.gradle/
 *.apk
 *.aab
+
+# Test coverage reports
+coverage/
+test-results/
+playwright-report/

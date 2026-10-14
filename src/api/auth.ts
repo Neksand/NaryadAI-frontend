@@ -1,7 +1,10 @@
 import { api } from '../lib/api-client';
 import { UserSchema, type User } from '../types/domain';
 
-export async function login(loginName: string, pin: string): Promise<{ user: User; access: string; refresh: string | null }> {
+export async function login(
+  loginName: string,
+  pin: string,
+): Promise<{ user: User; access: string; refresh: string | null }> {
   const { data } = await api.post('/auth/login', { login: loginName, pin });
   const access: string = data.access_token ?? data.accessToken;
   const refresh: string | null = data.refresh_token ?? data.refreshToken ?? null;

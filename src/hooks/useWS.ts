@@ -27,19 +27,33 @@ export function useRealtime(enabled = true) {
     let ws: WebSocket | null = null;
     let closed = false;
     let timer: ReturnType<typeof setTimeout>;
+    let hideTimer: ReturnType<typeof setTimeout>;
 
     const connect = () => {
       setStatus('connecting');
       ws = new WebSocket(wsUrlWithToken(token));
       ws.onopen = () => {
         setStatus('open');
+        // Баннер «связь восстановлена» — только после реального разрыва, прячем через 6с.
+        if (attempt.current > 0) {
+          setReconnected(true);
+          clearTimeout(hideTimer);
+          hideTimer = setTimeout(() => setReconnected(false), 6000);
+        }
         attempt.current = 0;
         ws?.send(JSON.stringify({ op: 'subscribe', channels: ['shift:current', 'user:me'] }));
       };
       ws.onmessage = (msg) => {
         try {
-          const data = JSON.parse(msg.data as string) as WsEvent & { type?: string; channels?: string[] };
-          if (data.type === 'SUBSCRIBED' || (data as unknown as { event?: string }).event === 'subscribed') return;
+          const data = JSON.parse(msg.data as string) as WsEvent & {
+            type?: string;
+            channels?: string[];
+          };
+          if (
+            data.type === 'SUBSCRIBED' ||
+            (data as unknown as { event?: string }).event === 'subscribed'
+          )
+            return;
           // Живая доставка идёт конвертом {"type", "timestamp", "payload"} (realtime.broadcast),
           // outbox-путь — {"event", "channels", "payload", "seq"}. Принимаем оба.
           const ev = (data.event ?? data.type ?? '') as string;
@@ -51,27 +65,62 @@ export function useRealtime(enabled = true) {
             lastSeq.current = data.seq;
           }
           if (!ev) return;
-          if (ev.startsWith('order.') || ev.startsWith('WORK_ORDER') || ev === 'counters.updated' || ev === 'employee.status_changed' || ev === 'insight.created' || ev === 'NOTIFICATION_CREATED' || ev.includes('ai_review') || ev.includes('AI_') || ev.includes('DEADLINE')) {
+          if (ev === 'WORK_ORDER_CREATED' || ev === 'order.created') {
+            const payload = data.payload as { id?: string; number?: number } | undefined;
+            if (payload?.id) {
+              window.dispatchEvent(
+                new CustomEvent('naryadai:work-order-created', { detail: payload }),
+              );
+            }
+          }
+          if (
+            ev.startsWith('order.') ||
+            ev.startsWith('WORK_ORDER') ||
+            ev === 'counters.updated' ||
+            ev === 'employee.status_changed' ||
+            ev === 'insight.created' ||
+            ev === 'NOTIFICATION_CREATED' ||
+            ev.includes('ai_review') ||
+            ev.includes('AI_') ||
+            ev.includes('DEADLINE')
+          ) {
             void qc.invalidateQueries({ queryKey: ['orders'] });
             void qc.invalidateQueries({ queryKey: ['board'] });
             void qc.invalidateQueries({ queryKey: ['notifications'] });
-            const p = data.payload as { id?: string; work_order_id?: string; order_id?: string } | undefined;
+            const p = data.payload as
+              { id?: string; work_order_id?: string; order_id?: string } | undefined;
             const orderId = p?.id ?? p?.work_order_id ?? p?.order_id;
             if (orderId) void qc.invalidateQueries({ queryKey: ['order', orderId] });
           }
-        } catch { /* ignore malformed frames */ }
+        } catch {
+          /* ignore malformed frames */
+        }
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (closed) return;
         setStatus('closed');
+        setReconnected(false);
+        // 4401 is an auth rejection from the API. Reconnecting with the same
+        // invalid token only creates an endless connection loop; return to login.
+        if (event?.code === 4401) {
+          useAuthStore.getState().logout();
+          return;
+        }
         const delay = BACKOFF[Math.min(attempt.current, BACKOFF.length - 1)] ?? 15000;
         attempt.current += 1;
-        timer = setTimeout(() => { setReconnected(true); connect(); }, delay);
+        timer = setTimeout(() => {
+          connect();
+        }, delay);
       };
     };
 
     connect();
-    return () => { closed = true; clearTimeout(timer); ws?.close(); };
+    return () => {
+      closed = true;
+      clearTimeout(timer);
+      clearTimeout(hideTimer);
+      ws?.close();
+    };
   }, [enabled, token, qc]);
 
   return { status, reconnected };

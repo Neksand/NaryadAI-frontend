@@ -1,7 +1,12 @@
 import { api, idempotencyHeaders } from '../lib/api-client';
 import { AIReviewSchema, type AIReview } from '../types/domain';
 
-export async function suggestAssignee(input: { area_id: string; equipment_id?: string; priority?: string; description?: string }) {
+export async function suggestAssignee(input: {
+  area_id: string;
+  equipment_id?: string;
+  priority?: string;
+  description?: string;
+}) {
   const { data } = await api.post('/ai/suggest-assignee', input);
   return data;
 }
@@ -46,16 +51,27 @@ export async function aiInsights(params: Record<string, string> = {}) {
   return data;
 }
 
-export async function transcribeAudio(file: Blob, workOrderId?: string) {
+export async function transcribeAudio(file: Blob, workOrderId?: string, language = 'ru') {
   const form = new FormData();
-  form.append('file', file, 'voice.webm');
+  form.append('file', file, 'voice.wav');
   if (workOrderId) form.append('work_order_id', workOrderId);
-  const { data } = await api.post('/ai/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
-  // Бэкенд отдаёт {transcript, ...}, фронт ждёт {text, confidence}
-  return { text: (data.transcript ?? data.text ?? '') as string, confidence: data.confidence as number | undefined };
+  form.append('language', language === 'kk' ? 'kk' : 'ru');
+  const { data } = await api.post('/ai/transcribe', form, { timeout: 300000 });
+  // Бэкенд отдаёт {transcript, ...}, фронт ждёт {text, confidence}.
+  return {
+    text: (data.transcript ?? data.text ?? '') as string,
+    confidence: data.confidence as number | undefined,
+    pending: Boolean(data.pending),
+  };
 }
 
-export async function planOrderFromInsight(insightId: string, input: { assignee_id?: string; crew_id?: string; due_at: string }, key?: string) {
-  const { data } = await api.post(`/analytics/insights/${insightId}/plan-order`, input, { headers: idempotencyHeaders(key) });
+export async function planOrderFromInsight(
+  insightId: string,
+  input: { assignee_id?: string; crew_id?: string; due_at: string },
+  key?: string,
+) {
+  const { data } = await api.post(`/analytics/insights/${insightId}/plan-order`, input, {
+    headers: idempotencyHeaders(key),
+  });
   return data;
 }

@@ -7,11 +7,21 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build:tauri"
   },
   "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "НарядAI",
+        "url": "index.html",
+        "backgroundColor": "#F2F4F8",
+        "fullscreen": false,
+        "resizable": true
+      }
+    ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' tauri: asset:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: tauri: asset: http://localhost:9000 http://127.0.0.1:9000 https:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:8080 http://127.0.0.1:8080 ws://localhost:8080 ws://127.0.0.1:8080 https://api.naryad-ai.kz wss://api.naryad-ai.kz; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     }
   },
   "bundle": {
@@ -23,6 +33,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "android": {
+      "minSdkVersion": 24
+    }
   }
 }

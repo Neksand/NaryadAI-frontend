@@ -11,8 +11,28 @@ void i18n
     resources: { ru: { translation: ru }, kk: { translation: kk } },
     fallbackLng: 'ru',
     supportedLngs: ['ru', 'kk'],
-    detection: { order: ['localStorage', 'navigator'], caches: ['localStorage'], lookupLocalStorage: 'naryadai.lang' },
+    detection: {
+      order: ['localStorage', 'navigator'],
+      caches: ['localStorage'],
+      lookupLocalStorage: 'naryadai.lang',
+    },
     interpolation: { escapeValue: false },
   });
+
+// Нативные контролы (календарь datetime-local и др.) берут язык из <html lang>.
+const syncHtmlLang = (lng: string) => {
+  try {
+    const short = (lng || 'ru').slice(0, 2);
+    document.documentElement.lang = short === 'kk' ? 'kk' : 'ru';
+  } catch {
+    /* ignore */
+  }
+};
+try {
+  syncHtmlLang(i18n.language || 'ru');
+  i18n.on('languageChanged', syncHtmlLang);
+} catch {
+  /* ignore */
+}
 
 export default i18n;

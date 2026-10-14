@@ -27,7 +27,7 @@
 
 ## Технологии
 
-React + TypeScript + Vite, живой сервер через WebSocket, данные через типизированный API-клиент, PWA (установка на телефон без магазинов приложений).
+React 19 + TypeScript + Vite, данные через типизированный API-клиент и TanStack Query, состояние в Zustand, схемы в Zod, локализация i18next (ru/kk), графики Recharts, стили Tailwind CSS 4, обновления по WebSocket, PWA (установка на телефон) и сборка под Tauri (десктоп/Android).
 
 ## Быстрый старт для разработчика
 
@@ -36,4 +36,25 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
-Адрес API задаётся только переменными окружения (`.env.development`, `.env.production`) — код при переезде не меняется.
+## Конфигурация
+
+Адрес backend задаётся только переменными окружения (`.env.development`, `.env.production`) — при переезде код не меняется:
+
+| Переменная | Назначение |
+|---|---|
+| `VITE_API_URL` | базовый адрес REST (`http://localhost:8080/api/v1`) |
+| `VITE_WS_URL` | адрес WebSocket (`ws://localhost:8080/api/ws`) |
+
+Для локальных адресов используйте `.env.local` (не попадает в репозиторий).
+
+## Скрипты
+
+| Команда | Что делает |
+|---|---|
+| `npm run dev` | дев-сервер Vite |
+| `npm run build` | production-сборка + service worker (PWA) |
+| `npm run typecheck` | проверка типов (`tsc --noEmit`) |
+| `npm run lint` | линтер `oxlint` |
+| `npm run test` | unit-тесты (Vitest) |
+| `npm run test:e2e` | сквозные тесты (Playwright, нужен запущенный backend) |
+| `npm run check:contract` | сверка доступных путей API с ожидаемым контрактом |

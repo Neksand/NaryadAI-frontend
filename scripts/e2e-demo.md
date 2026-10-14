@@ -1,7 +1,7 @@
 # E2E hackathon demo (manual + Playwright outline)
 
 Seeded dev backend required (`admin/1234`, `master1/3333`, `manager1/2222`, `worker01/1001`).
-Live prod (`79.108.160.125:8080`) intentionally rejects demo PINs — run E2E against local seed.
+Production does not contain demo users. Run E2E against the local seeded API; configure any remote host with an untracked env file.
 
 ## Script (25 steps condensed)
 

@@ -1,0 +1,53 @@
+name: Frontend CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium for browser scenarios
+        run: npx playwright install --with-deps chromium
+      - name: Lint frontend source
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
+      - name: TypeScript check
+        run: npm run typecheck
+      - name: Unit tests with coverage gates
+        run: npm run test:coverage
+      - name: Production build
+        run: npm run build
+      - name: Browser workflow scenarios
+        run: npm run test:e2e
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: coverage/
+          if-no-files-found: ignore
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          if-no-files-found: ignore

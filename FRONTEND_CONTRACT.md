@@ -1,17 +1,16 @@
 # FRONTEND_CONTRACT.md — реальный контракт FastAPI-бэкенда НарядAI
 
-> Источник истины: живой бэкенд `http://79.108.160.125:8080` (проверено 2026-10-08:
-> `GET /openapi.json` → OpenAPI 3.1.0, 93 paths; `GET /health` → `{"status":"ok","database":"ok","ai":"mock"}`).
-> Локальный источник: `NaryadAI-FastAPI-Backend/app/{main,routers/*,deps,errors,security}.py`, `migrations/001_initial.sql`.
-> Приоритет: live behavior > live OpenAPI > source > README. Дизайн-токены: `NaryadAI-design/project/tokens.json` + `src/kit.css`.
+> Источник истины: локальный FastAPI-код, его OpenAPI и миграции. Удалённый адрес задаётся отдельно через env и не фиксируется в репозитории.
+> Локальный источник: `NaryadAI-FastAPI-Backend/app/{main,routers/*,deps,errors,security}.py`, `migrations/*.sql`.
+> Приоритет: source + локальная проверка OpenAPI > README. Дизайн-токены: `NaryadAI-design/project/tokens.json` + `src/kit.css`.
 
 ## 1. База и окружение
 
 | Назначение | Значение |
 |---|---|
 | Dev (seed, демо-логины работают) | `VITE_API_URL=http://localhost:8080/api/v1`, `VITE_WS_URL=ws://localhost:8080/api/ws` |
-| Live dev (seed отключён, нужны реальные креды) | `VITE_API_URL=http://79.108.160.125:8080/api/v1`, `VITE_WS_URL=ws://79.108.160.125:8080/api/ws` |
-| Prod (только env, без смены кода) | `VITE_API_URL=https://api.naryad-ai.kz/api/v1`, `VITE_WS_URL=wss://api.naryad-ai.kz/api/ws` |
+| Remote dev | Set `VITE_API_URL` and `VITE_WS_URL` in an untracked `.env.local`; use real credentials. |
+| Prod | `VITE_API_URL=https://api.naryad-ai.kz/api/v1`, `VITE_WS_URL=wss://api.naryad-ai.kz/api/ws` |
 
 URL только из env (`src/lib/env.ts`). CORS бэкенда уже разрешает `http://localhost:5173` (`.env.example: CORS_ORIGINS`).
 

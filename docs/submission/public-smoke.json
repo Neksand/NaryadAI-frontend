@@ -1,0 +1,75 @@
+{
+  "at": "2026-10-14T05:04:52.625412+00:00",
+  "api": "http://127.0.0.1:8080/api/v1",
+  "all_ok": true,
+  "steps": [
+    {
+      "step": "login master1",
+      "ok": true,
+      "ms": 67
+    },
+    {
+      "step": "login worker01",
+      "ok": true,
+      "ms": 39
+    },
+    {
+      "step": "me worker",
+      "ok": true,
+      "ms": 9
+    },
+    {
+      "step": "issue order",
+      "ok": true,
+      "ms": 18,
+      "id": "31ff2884-34fb-4f96-b29a-c890f418b0a6"
+    },
+    {
+      "step": "issue visible to worker <=5s",
+      "ok": true,
+      "ms": 5
+    },
+    {
+      "step": "accept",
+      "ok": true,
+      "ms": 9
+    },
+    {
+      "step": "double accept -> 409",
+      "ok": true,
+      "ms": 6,
+      "code": "invalid_transition"
+    },
+    {
+      "step": "accept visible to master <=5s",
+      "ok": true,
+      "ms": 14
+    },
+    {
+      "step": "start",
+      "ok": true,
+      "ms": 9
+    },
+    {
+      "step": "complete with report",
+      "ok": true,
+      "ms": 8
+    },
+    {
+      "step": "ai review ready",
+      "ok": true,
+      "ms": 53527
+    },
+    {
+      "step": "master close agree_ai",
+      "ok": true,
+      "ms": 38
+    },
+    {
+      "step": "closed",
+      "ok": true,
+      "ms": 37,
+      "status": "closed"
+    }
+  ]
+}

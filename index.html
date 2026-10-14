@@ -9,9 +9,14 @@
     <meta name="description" content="НарядAI — интеллектуальная система производственных нарядов" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>НарядAI — производственные наряды</title>
+    <style>
+      html, body { background: #f2f4f8; margin: 0; }
+      #root { min-height: 100vh; min-height: 100dvh; background: #f2f4f8; }
+      .boot-html { min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot-html"><div style="text-align:center;color:#0b4c94;font-weight:800;font-size:24px">НарядAI<br><span style="font-size:14px;font-weight:400;color:#44546a">загрузка…</span></div></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
