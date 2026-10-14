@@ -286,9 +286,7 @@ export default function MasterNew() {
         {form.equipment_id && (
           <div className="flex flex-col gap-2">
             <span className="label">{t('master.similarRepairs')}</span>
-            {similar.isPending && (
-              <span className="text-sm opacity-70">{t('common.loading')}</span>
-            )}
+            {similar.isPending && <span className="text-sm opacity-70">{t('common.loading')}</span>}
             {!similar.isPending && (similar.data ?? []).length === 0 && (
               <span className="text-sm opacity-70">{t('master.noSimilar')}</span>
             )}

@@ -110,10 +110,9 @@ export async function getSimilarRepairs(
 ): Promise<SimilarRepairItem[]> {
   const params: Record<string, unknown> = { limit: opts.limit ?? 3 };
   if (opts.faultCodeId) params.fault_code_id = opts.faultCodeId;
-  const { data } = await api.get(
-    `/equipment/${encodeURIComponent(equipmentId)}/similar-repairs`,
-    { params },
-  );
+  const { data } = await api.get(`/equipment/${encodeURIComponent(equipmentId)}/similar-repairs`, {
+    params,
+  });
   const items = Array.isArray(data) ? data : data?.items;
   if (!Array.isArray(items)) throw new Error('Unexpected similar repairs response shape');
   return items as SimilarRepairItem[];

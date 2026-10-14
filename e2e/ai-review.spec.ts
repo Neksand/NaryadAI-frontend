@@ -1,5 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
+import { requireLiveApi } from './live-api';
+
 test.setTimeout(60_000);
 
 // Live: приёмка ИИ мастером против реального API http://127.0.0.1:8080/api/v1
@@ -26,8 +28,11 @@ async function gotoLogin(page: Page) {
     .evaluate(async () => {
       for (let i = 0; i < 4; i++) {
         try {
-          await fetch('/api/v1/me', { method: 'GET', signal: AbortSignal.timeout(8000) });
-          return true;
+          const _liveRes = await fetch('/api/v1/me', {
+            method: 'GET',
+            signal: AbortSignal.timeout(8000),
+          });
+          return _liveRes.status < 500;
         } catch {
           await new Promise((r) => setTimeout(r, 1000));
         }
@@ -55,6 +60,7 @@ async function loginAsMaster(page: Page) {
 async function liveReviewOrder(
   request: APIRequestContext,
 ): Promise<{ id: string; description: string }> {
+  await requireLiveApi(request);
   const login = await request.post('/api/v1/auth/login', {
     data: { login: 'master1', pin: '3333' },
   });

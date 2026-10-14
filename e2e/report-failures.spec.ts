@@ -22,8 +22,8 @@ async function gotoLogin(page: Page) {
   const live = await page
     .evaluate(async () => {
       try {
-        await fetch('/api/v1/me', { method: 'GET' });
-        return true;
+        const _liveRes = await fetch('/api/v1/me', { method: 'GET' });
+        return _liveRes.status < 500;
       } catch {
         return false;
       }
@@ -51,7 +51,8 @@ test('live: default orders/xlsx export completes with a download link', async ({
   const panel = await loginAsManager(page);
   const posts: number[] = [];
   page.on('response', (r) => {
-    if (r.url().includes('/reports/export') && r.request().method() === 'POST' && r.ok()) posts.push(r.status());
+    if (r.url().includes('/reports/export') && r.request().method() === 'POST' && r.ok())
+      posts.push(r.status());
   });
   await panel.getByRole('button', { name: 'Подготовить отчёт' }).click();
   await expect(panel.getByRole('link', { name: 'Скачать отчёт' })).toBeVisible({ timeout: 90000 });
@@ -62,7 +63,8 @@ test('live: retrying export creates a second live job', async ({ page }) => {
   const panel = await loginAsManager(page);
   let postCalls = 0;
   page.on('response', (r) => {
-    if (r.url().includes('/reports/export') && r.request().method() === 'POST' && r.ok()) postCalls += 1;
+    if (r.url().includes('/reports/export') && r.request().method() === 'POST' && r.ok())
+      postCalls += 1;
   });
   const create = panel.getByRole('button', { name: 'Подготовить отчёт' });
   await expect(create).toBeVisible({ timeout: 20000 });

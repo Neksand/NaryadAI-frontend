@@ -26,8 +26,8 @@ async function gotoLogin(page: Page) {
   const live = await page
     .evaluate(async () => {
       try {
-        await fetch('/api/v1/me', { method: 'GET' });
-        return true;
+        const _liveRes = await fetch('/api/v1/me', { method: 'GET' });
+        return _liveRes.status < 500;
       } catch {
         return false;
       }

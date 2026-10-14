@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
+import { requireLiveApi } from './live-api';
+
 test.setTimeout(60_000);
 
 // Live: действия worker с причинами из живого справочника /dict/reasons
@@ -26,8 +28,11 @@ async function gotoLogin(page: Page) {
     .evaluate(async () => {
       for (let i = 0; i < 4; i++) {
         try {
-          await fetch('/api/v1/me', { method: 'GET', signal: AbortSignal.timeout(8000) });
-          return true;
+          const _liveRes = await fetch('/api/v1/me', {
+            method: 'GET',
+            signal: AbortSignal.timeout(8000),
+          });
+          return _liveRes.status < 500;
         } catch {
           await new Promise((r) => setTimeout(r, 1000));
         }
@@ -49,6 +54,7 @@ async function loginAsWorker(page: Page) {
 }
 
 async function apiToken(request: APIRequestContext, login: string, pin: string): Promise<string> {
+  await requireLiveApi(request);
   const res = await request.post('/api/v1/auth/login', { data: { login, pin } });
   expect(res.status()).toBe(200);
   return (await res.json()).access_token as string;

@@ -37,8 +37,11 @@ async function gotoLogin(page: Page) {
     .evaluate(async () => {
       for (let i = 0; i < 4; i++) {
         try {
-          await fetch('/api/v1/me', { method: 'GET', signal: AbortSignal.timeout(8000) });
-          return true;
+          const _liveRes = await fetch('/api/v1/me', {
+            method: 'GET',
+            signal: AbortSignal.timeout(8000),
+          });
+          return _liveRes.status < 500;
         } catch {
           await new Promise((r) => setTimeout(r, 1000));
         }

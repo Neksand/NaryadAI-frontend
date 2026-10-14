@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { requireLiveApi } from './live-api';
+
 test.setTimeout(60_000);
 
 // Live: ИИ-инсайты ManagerDashboard + создание планового наряда из инсайта
@@ -24,8 +26,11 @@ async function gotoLogin(page: Page) {
     .evaluate(async () => {
       for (let i = 0; i < 4; i++) {
         try {
-          await fetch('/api/v1/me', { method: 'GET', signal: AbortSignal.timeout(8000) });
-          return true;
+          const _liveRes = await fetch('/api/v1/me', {
+            method: 'GET',
+            signal: AbortSignal.timeout(8000),
+          });
+          return _liveRes.status < 500;
         } catch {
           await new Promise((r) => setTimeout(r, 1000));
         }
@@ -68,6 +73,7 @@ test('live: plan-order button from insight talks to the live stand', async ({ pa
   // без equipment в скоупе бэкенд отвечает 422, с equipment сейчас 500.
   // Поэтому честное live-покрытие: запрос реально уходит на стенд, фронт
   // показывает либо успех-баннер, либо текст живой ошибки. Принимаем ОБА.
+  await requireLiveApi(request);
   const login = await request.post('/api/v1/auth/login', {
     data: { login: 'manager1', pin: '2222' },
   });
