@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: asset:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: tauri: asset: http://localhost:9000 http://127.0.0.1:9000 https:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:8080 http://127.0.0.1:8080 ws://localhost:8080 ws://127.0.0.1:8080 https://api.naryad-ai.kz wss://api.naryad-ai.kz; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+      "csp": "default-src 'self' tauri: asset:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: tauri: asset: http://localhost:9000 http://127.0.0.1:9000 http://79.108.166.207:5000 https:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:8080 http://127.0.0.1:8080 ws://localhost:8080 ws://127.0.0.1:8080 https://api.naryad-ai.kz wss://api.naryad-ai.kz http://79.108.166.207 ws://79.108.166.207 http://79.108.166.207:5000; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     }
   },
   "bundle": {
