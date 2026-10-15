@@ -6,8 +6,6 @@ test.setTimeout(60_000);
 // Through the vite dev-server /api proxy, no page.route mocks.
 // CI-guard copied from e2e/manager-areas.spec.ts: without a live stand the
 // tests skip (no live API in CI); with the stand up they run for real.
-// NOTE: the forecast router is mounted by the coordinator (not wired into
-// main.py yet) — until then the API tests skip on 404 instead of failing.
 
 async function gotoLogin(page: Page) {
   await page.addInitScript(() => {
@@ -64,10 +62,6 @@ test('live: failure-forecast ranks the seed anomaly K-3 at the top', async ({ pa
   const res = await page.request.get('/api/v1/analytics/failure-forecast', {
     headers: { Authorization: `Bearer ${token}` },
   });
-  test.skip(
-    res.status() === 404,
-    'forecast router not mounted yet — coordinator wires it into main.py',
-  );
   expect(res.ok()).toBeTruthy();
   const items = (await res.json().catch(() => null)) as
     { equipment_name: string; probability: number; recent: number; growth: number }[] | null;
@@ -82,14 +76,12 @@ test('live: failure-forecast ranks the seed anomaly K-3 at the top', async ({ pa
 test('live: manager sees the forecast panel', async ({ page }) => {
   await loginAsManager(page);
   await page.goto('/manager', { waitUntil: 'domcontentloaded' });
-  const panel = page.getByRole('heading', { name: 'Прогноз отказов' });
-  const visible = await panel.isVisible({ timeout: 15000 }).catch(() => false);
-  test.skip(!visible, 'ForecastPanel not mounted yet — coordinator mounts it on /manager');
-  await expect(panel).toBeVisible();
+  const panel = page.getByRole('heading', { name: 'Риск отказов' });
+  await expect(panel).toBeVisible({ timeout: 15000 });
   await expect(async () => {
     const pct = await page
-      .locator('section[aria-label="Прогноз отказов"]')
-      .getByText(/^\d+%$/)
+      .locator('section[aria-label="Риск отказов"]')
+      .getByText(/^Индекс риска: \d+ \/ 100$/)
       .count();
     expect(pct).toBeGreaterThan(0);
   }).toPass({ timeout: 20000 });

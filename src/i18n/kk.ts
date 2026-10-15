@@ -107,6 +107,12 @@ export default {
     changePriority: 'Басымдықты өзгерту',
   },
   worker: {
+    assessment: 'Орындалу бағасы',
+    aiRecommendation: 'ЖИ ұсынымы',
+    aiScore: 'ЖИ бағасы',
+    photoEvidence: 'Дейін және кейін фотосуреттері',
+    photoReviewNote: 'Фотосуреттер жұмысты растайды. Соңғы шешімді шебер қабылдайды.',
+
     active: 'Қазір жұмыста',
     queue: 'Кезек',
     urgent: 'Шұғыл',
@@ -119,6 +125,11 @@ export default {
     workDone: 'Не істелді',
     faultCode: 'Ақау шифры',
     materials: 'Материалдар',
+    material: 'Материал',
+    quantity: 'Саны',
+    addMaterial: 'Материал қосу',
+    removeMaterial: 'Материалды жою',
+    invalidMaterial: 'Материалды және нөлден үлкен санды таңдаңыз (1 000 000 дейін).',
     restored: 'Жабдық қалпына келтірілді',
     afterPhotos: '«Кейін» фото',
     needAfterPhoto:
@@ -147,6 +158,12 @@ export default {
     },
   },
   master: {
+    manualScore: 'Шебер бағасы (0–100)',
+    manualReviewNote:
+      'ЖИ сенімділігі төмен болса, нәтижені тексеріп, өз бағаңызды пікірмен көрсетіңіз немесе нарядты қайта өңдеуге қайтарыңыз.',
+    overrideClose: 'Өз бағаммен қабылдау',
+
+    equipmentStopped: 'Жабдық тоқтатылды',
     shift: 'Ауысым',
     issued: 'Берілді',
     doneToday: 'Орындалды',
@@ -164,6 +181,7 @@ export default {
     beforePhoto: '«Дейін» фото',
     review: 'ЖИ қабылдауы',
     reviewPending: 'ЖИ тексеруі әлі жүріп жатыр, күтіңіз…',
+    agreeRework: 'Келісемін — қайта өңдеуге',
     agreeClose: 'Келісемін — жабу',
     sendRework: 'Өңдеуге қайтару',
     reworkNeedsComment: 'Өңдеуге қайтару үшін пікір қажет',
@@ -212,8 +230,10 @@ export default {
     ratingRejected: 'Қабылданбады',
     ratingSample: 'Тұрақты бағалау үшін кемінде 5 наряд жабу қажет.',
     noRating: 'Рейтингті есептеу үшін әзірге дерек жоқ.',
-    forecast: 'Ақау болжамы',
-    forecastProbability: 'Ықтималдық',
+    forecast: 'Ақау қаупі',
+    forecastProbability: 'Қауіп индексі',
+    forecastNote:
+      'Жөндеу тарихына негізделген 0–100 эвристикалық шкала. Бұл ақау ықтималдығы емес, тексеру басымдығы.',
     forecastRecent: '30 күндегі жоспардан тыс',
     forecastGrowth: 'Өсім',
   },
@@ -308,6 +328,7 @@ export default {
     recommendation: 'ЖИ ұсынысы',
     confidence: 'Сенімділік',
     apply: 'Қолдану',
+    verdict_accepted_with_remarks: 'Ескертулермен қабылданды',
     verdict_accepted: 'Қабылданды',
     verdict_needs_rework: 'Өңдеу қажет',
     verdict_review: 'Шебер шешімі қажет',

@@ -222,3 +222,24 @@ describe('MasterNew AI and photo', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
   });
 });
+
+it('captures downtime and comment and displays current worker availability', async () => {
+  const u = userEvent.setup();
+  apiGetMock.mockResolvedValue({ data: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] });
+  renderNew();
+  expect(await screen.findByRole('option', { name: 'Иван · Свободен' })).toBeVisible();
+  await u.selectOptions(screen.getByLabelText(/Участок/), 'a1');
+  await u.selectOptions(screen.getByLabelText(/Оборудование/), 'e1');
+  await u.type(screen.getByPlaceholderText('дд.мм.гггг, чч:мм'), '12.10.2026, 09:05');
+  await u.type(screen.getByLabelText(/Описание проблемы/), 'Течь масла из редуктора');
+  await u.selectOptions(screen.getByLabelText(/Исполнитель — человек или бригада/), 'w1');
+  await u.type(screen.getByLabelText('Комментарий'), '  Остановлено по инструкции  ');
+  await u.click(screen.getByLabelText('Зафиксировать простой оборудования'));
+  await u.click(screen.getByRole('button', { name: 'Новый наряд' }));
+  await waitFor(() =>
+    expect(woMocks.createWorkOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ equipment_stopped: true, comment: 'Остановлено по инструкции' }),
+      expect.any(String),
+    ),
+  );
+});

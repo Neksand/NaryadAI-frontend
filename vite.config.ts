@@ -22,8 +22,6 @@ export default defineConfig(({ mode }) => {
       target: 'es2020',
       chunkSizeWarningLimit: 1200,
     },
-    // Vitest uses esbuild for TSX transforms; Vite 8 production builds use Oxc.
-    ...(mode === 'test' ? { esbuild: { jsx: 'automatic' } } : {}),
     plugins: [
       react({ jsxRuntime: 'automatic' }),
       tailwindcss(),
@@ -37,13 +35,9 @@ export default defineConfig(({ mode }) => {
               includeAssets: ['icon.svg', 'favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512.png', 'apple-touch-icon.png'],
               workbox: {
                 navigateFallback: '/index.html',
-                runtimeCaching: [
-                  {
-                    urlPattern: /^https?:\/\/.*\/api\/v1\/(sites|teams|equipment|materials|fault-codes)/,
-                    handler: 'StaleWhileRevalidate',
-                    options: { cacheName: 'naryadai-catalog', expiration: { maxEntries: 100, maxAgeSeconds: 3600 } },
-                  },
-                ],
+                // Authenticated responses belong to an account. URL-only Workbox
+                // caches can expose the previous worker's area on a shared phone.
+                // Offline orders use the account-scoped IndexedDB snapshot cache.
               },
             }),
           ]),

@@ -13,15 +13,17 @@ Fixtures:
 
 from __future__ import annotations
 
+import argparse
 import pathlib
+import sys
 import xml.sax.saxutils as sax
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 FIX = ROOT / "e2e" / "fixtures"
 
-# Live seeded area id ("Дробление") - equipment.area_id is FK -> areas(id).
-AREA_ID = "95a6c21e-6321-47b8-8abf-06bab0e1a0e7"
+# Placeholder only: CLI callers must pass an area ID from their live database.
+AREA_ID = ""
 
 
 def _col(n: int) -> str:
@@ -111,9 +113,20 @@ BAD_ROWS = [
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--area-id', required=True)
+    parser.add_argument('--stdout-fixture', choices=['import-ok.xlsx', 'import-bad.xlsx'])
+    args = parser.parse_args()
+    fixtures = {
+        'import-ok.xlsx': [row[:2] + [args.area_id] + row[3:] for row in OK_ROWS],
+        'import-bad.xlsx': [row[:2] + [args.area_id] + row[3:] for row in BAD_ROWS],
+    }
+    if args.stdout_fixture:
+        sys.stdout.buffer.write(make_xlsx(HEADER, fixtures[args.stdout_fixture]))
+        return
     FIX.mkdir(parents=True, exist_ok=True)
-    (FIX / "import-ok.xlsx").write_bytes(make_xlsx(HEADER, OK_ROWS))
-    (FIX / "import-bad.xlsx").write_bytes(make_xlsx(HEADER, BAD_ROWS))
+    (FIX / "import-ok.xlsx").write_bytes(make_xlsx(HEADER, fixtures['import-ok.xlsx']))
+    (FIX / "import-bad.xlsx").write_bytes(make_xlsx(HEADER, fixtures['import-bad.xlsx']))
     print(f"wrote {FIX / 'import-ok.xlsx'} ({len(OK_ROWS)} rows)")
     print(f"wrote {FIX / 'import-bad.xlsx'} ({len(BAD_ROWS)} rows)")
 

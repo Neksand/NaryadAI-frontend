@@ -1,6 +1,8 @@
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { requireLiveApi } from './live-api';
 
 test.setTimeout(60_000);
 // Один живой стенд на всех воркеров: тесты файла идут строго серийно, иначе
@@ -36,26 +38,7 @@ async function gotoLogin(page: Page) {
     localStorage.setItem('naryadai.lang', 'ru');
   });
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
-  // Живой API за vite-прокси: любой HTTP-ответ от /api/v1/* (включая 401) = стенд поднят.
-  // Ретраи: dev-сервер под параллельной нагрузкой может на секунды подвисать —
-  // скипаемся только если стенд стабильно недоступен.
-  const live = await page
-    .evaluate(async () => {
-      for (let i = 0; i < 4; i++) {
-        try {
-          const _liveRes = await fetch('/api/v1/me', {
-            method: 'GET',
-            signal: AbortSignal.timeout(8000),
-          });
-          return _liveRes.status < 500;
-        } catch {
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      }
-      return false;
-    })
-    .catch(() => false);
-  test.skip(!live, 'no live API stand — run backend e2e_stand + uvicorn first');
+  await requireLiveApi(page.request);
   await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible({ timeout: 20000 });
 }
 
@@ -76,9 +59,31 @@ async function openEquipmentImport(page: Page) {
 }
 
 async function attachFixture(page: Page, name: 'import-ok.xlsx' | 'import-bad.xlsx') {
+  const login = await page.request.post('/api/v1/auth/login', {
+    data: { login: 'admin', pin: '1234' },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { access_token } = await login.json();
+  const sites = await page.request.get('/api/v1/sites', {
+    headers: { Authorization: `Bearer ${access_token}` },
+  });
+  expect(sites.ok()).toBeTruthy();
+  const body = await sites.json();
+  const areaId = (Array.isArray(body) ? body : (body.items ?? body.data))[0]?.id;
+  expect(areaId).toBeTruthy();
   const dir = path.dirname(fileURLToPath(import.meta.url));
-  const file = path.resolve(dir, 'fixtures', name);
-  await page.getByLabel('Excel-файл (.xlsx)').setInputFiles(file);
+  const buffer = execFileSync('python3', [
+    path.resolve(dir, '../scripts/make-import-fixtures.py'),
+    '--area-id',
+    areaId,
+    '--stdout-fixture',
+    name,
+  ]);
+  await page.getByLabel('Excel-файл (.xlsx)').setInputFiles({
+    name,
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer,
+  });
 }
 
 /** API-подчистка отдельным запросным контекстом (своя admin-сессия через
@@ -114,7 +119,7 @@ async function deleteEquipmentByPrefix(
 test.afterEach(async ({ request }, testInfo) => {
   if (testInfo.status === 'skipped') return;
   try {
-    const res = await deleteEquipmentByPrefix(request, 'e2e-');
+    const res = await deleteEquipmentByPrefix(request, 'e2e-ok-');
     // eslint-disable-next-line no-console
     console.log(`[cleanup] catalog-import afterEach: ${res}`);
   } catch {

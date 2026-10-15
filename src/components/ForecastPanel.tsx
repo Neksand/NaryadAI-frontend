@@ -11,7 +11,7 @@ export interface ForecastItem {
   growth: number;
 }
 
-/** Топ-N оборудования с наивысшей вероятностью отказа (бэкенд уже сортирует по убыванию). */
+/** Топ-N оборудования по эвристическому индексу риска (бэкенд уже сортирует по убыванию). */
 export async function fetchFailureForecast(limit = 5): Promise<ForecastItem[]> {
   const { data } = await api.get('/analytics/failure-forecast');
   const raw = Array.isArray(data) ? data : (data?.items ?? data?.data ?? []);
@@ -28,6 +28,7 @@ export function ForecastPanel({ limit = 5 }: { limit?: number }) {
   return (
     <section className="card flex flex-col gap-3" aria-label={t('analytics.forecast')}>
       <h2 className="font-bold text-[17px]">{t('analytics.forecast')}</h2>
+      <p className="text-sm text-[var(--ink-muted)]">{t('analytics.forecastNote')}</p>
       {query.isPending ? (
         <SkeletonList rows={2} />
       ) : query.isError ? (
@@ -53,9 +54,9 @@ export function ForecastPanel({ limit = 5 }: { limit?: number }) {
               </div>
               <span
                 className="num font-bold"
-                aria-label={`${t('analytics.forecastProbability')}: ${Math.round(item.probability * 100)}%`}
+                aria-label={`${t('analytics.forecastProbability')}: ${Math.round(item.probability * 100)} / 100`}
               >
-                {Math.round(item.probability * 100)}%
+                {t('analytics.forecastProbability')}: {Math.round(item.probability * 100)} / 100
               </span>
             </li>
           ))}

@@ -1,0 +1,43 @@
+{
+  "durationMs": 5887,
+  "realtimeMs": 218,
+  "orderId": "5c6c4de3-65ed-4aae-8c7f-f9f3d8a02c12",
+  "finalStatus": "closed",
+  "automatedCreationMs": 1050,
+  "creationActionCount": 8,
+  "creationActions": [
+    {
+      "type": "click",
+      "field": "kind"
+    },
+    {
+      "type": "select",
+      "field": "area"
+    },
+    {
+      "type": "select",
+      "field": "equipment"
+    },
+    {
+      "type": "fill",
+      "field": "due_at"
+    },
+    {
+      "type": "fill",
+      "field": "description"
+    },
+    {
+      "type": "select",
+      "field": "assignee"
+    },
+    {
+      "type": "fileUpload",
+      "field": "before_photo"
+    },
+    {
+      "type": "click",
+      "field": "submit"
+    }
+  ],
+  "creationCountDefinition": "Automated form actions: one click, selectOption, fill or setInputFiles = one action. Login/navigation, keyboard keystrokes and native file-picker taps excluded. Not a human six-tap/time study."
+}

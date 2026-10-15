@@ -29,9 +29,11 @@ export default function MasterNew() {
     due_at: '',
     norm_minutes: 60,
     equipment_stopped: false,
+    comment: '',
   });
   const [photoIds, setPhotoIds] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const areas = useQuery({ queryKey: ['catalog', 'sites'], queryFn: () => catalogList('sites') });
   const equipment = useQuery({
@@ -83,6 +85,7 @@ export default function MasterNew() {
           norm_minutes: form.norm_minutes,
           equipment_stopped: form.equipment_stopped,
           photo_ids: photoIds,
+          comment: form.comment.trim() || undefined,
         },
         newUUID(),
       ),
@@ -94,7 +97,8 @@ export default function MasterNew() {
     form.due_at &&
     form.description.trim().length >= 3 &&
     (form.assignee_id || form.crew_id) &&
-    !create.isPending;
+    !create.isPending &&
+    !uploadingPhoto;
 
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const err = create.isError ? toLocalizedError(create.error) : null;
@@ -174,22 +178,24 @@ export default function MasterNew() {
             <DateTimeField value={form.due_at} onChange={(iso) => set('due_at', iso)} required />
           </label>
         </div>
-        <label className="flex flex-col gap-1">
-          <span className="label">
-            {t('master.description')} *{' '}
+        <div className="flex flex-col gap-1">
+          <div className="label">
+            <label htmlFor="order-description">{t('master.description')} *</label>{' '}
             <VoiceButton
               onText={(txt) =>
                 set('description', (form.description ? form.description + ' ' : '') + txt)
               }
             />
-          </span>
+          </div>
           <textarea
+            id="order-description"
             className="input area"
             value={form.description}
             onChange={(e) => set('description', e.target.value)}
             required
+            maxLength={4000}
           />
-        </label>
+        </div>
         <label className="flex flex-col gap-1">
           <span className="label">{t('master.assigneeHint')}</span>
           <select
@@ -201,13 +207,21 @@ export default function MasterNew() {
             }}
           >
             <option value="">—</option>
-            {((workers.data ?? []) as { id: string; full_name?: string; name?: string }[]).map(
-              (w) => (
-                <option key={w.id} value={w.id}>
-                  {w.full_name ?? w.name ?? w.id}
-                </option>
-              ),
-            )}
+            {(
+              (workers.data ?? []) as {
+                id: string;
+                full_name?: string;
+                name?: string;
+                current_status?: string;
+              }[]
+            ).map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.full_name ?? w.name ?? w.id}
+                {w.current_status
+                  ? ` · ${t(`empStatus.${w.current_status}`, w.current_status)}`
+                  : ''}
+              </option>
+            ))}
           </select>
         </label>
         {!workers.isPending && (workers.data ?? []).length === 0 && (
@@ -335,6 +349,23 @@ export default function MasterNew() {
             ))}
           </div>
         )}
+        <label className="flex flex-col gap-1">
+          <span className="label">{t('common.comment')}</span>
+          <input
+            className="input"
+            value={form.comment}
+            maxLength={4000}
+            onChange={(e) => set('comment', e.target.value)}
+          />
+        </label>
+        <label className="flex gap-2 items-center min-h-[48px]">
+          <input
+            type="checkbox"
+            checked={form.equipment_stopped}
+            onChange={(e) => set('equipment_stopped', e.target.checked)}
+          />
+          {t('master.equipmentStopped')}
+        </label>
         <div className="flex flex-col gap-1">
           <span className="label">{t('master.beforePhoto')}</span>
           <label className="file-btn">
@@ -342,20 +373,25 @@ export default function MasterNew() {
             <input
               type="file"
               className="hidden"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={uploadingPhoto || photoIds.length >= 5}
               onChange={async (e) => {
                 const f = e.target.files?.[0];
-                if (!f) return;
+                if (!f || uploadingPhoto || photoIds.length >= 5) return;
                 try {
+                  setUploadingPhoto(true);
                   setPhotoError(null);
                   const r = await uploadPhoto(f, 'before');
                   setPhotoIds((p) => [...p, r.id]);
                 } catch (err) {
                   setPhotoError(toLocalizedError(err).message);
+                } finally {
+                  setUploadingPhoto(false);
                 }
               }}
             />
           </label>
+          {uploadingPhoto && <span role="status">{t('common.loading')}</span>}
           {photoIds.length > 0 && (
             <span className="chip ok">
               <Icon name="check" size={14} /> {photoIds.length}

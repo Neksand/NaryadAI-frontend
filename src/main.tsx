@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import './i18n/config';
 import App from './App.tsx';
+import { bindAuthQueryCache } from './lib/auth-query-cache';
 import { isTauri } from './lib/is-tauri';
 
 // Tauri APK/WebView: только HashRouter (BrowserRouter даёт пустой экран
@@ -27,6 +28,8 @@ const queryClient = new QueryClient({
     mutations: { retry: 0 },
   },
 });
+
+bindAuthQueryCache(queryClient);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

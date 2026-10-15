@@ -142,7 +142,7 @@ describe('useOfflineQueue', () => {
           code: `http_${status}`,
         }),
       ]);
-      expect(store.get('naryadai.offline-queue')).toEqual([]);
+      expect(store.get('naryadai.offline-queue:anonymous')).toEqual([]);
       expect(transitionMock).toHaveBeenCalledTimes(1);
     },
   );
@@ -197,7 +197,7 @@ describe('useOfflineQueue', () => {
           message: `server says ${code}`,
         }),
       ]);
-      expect(store.get('naryadai.offline-notices')).toHaveLength(1);
+      expect(store.get('naryadai.offline-notices:anonymous')).toHaveLength(1);
 
       await act(async () => {
         await result.current.replay();
@@ -207,7 +207,7 @@ describe('useOfflineQueue', () => {
   );
 
   it('lets the worker dismiss an already explained sync conflict', async () => {
-    store.set('naryadai.offline-notices', [
+    store.set('naryadai.offline-notices:anonymous', [
       {
         key: 'notice-1',
         orderId: 'o1',
@@ -223,7 +223,7 @@ describe('useOfflineQueue', () => {
       await result.current.dismissNotice('notice-1');
     });
     expect(result.current.notices).toEqual([]);
-    expect(store.get('naryadai.offline-notices')).toEqual([]);
+    expect(store.get('naryadai.offline-notices:anonymous')).toEqual([]);
   });
 
   it('stops on network error keeping order', async () => {
@@ -253,7 +253,7 @@ describe('useOfflineQueue', () => {
     });
 
     expect(transitionMock).not.toHaveBeenCalled();
-    expect(store.get('naryadai.offline-queue')).toEqual([]);
+    expect(store.get('naryadai.offline-queue:anonymous')).toEqual([]);
     expect(result.current.count).toBe(0);
   });
 

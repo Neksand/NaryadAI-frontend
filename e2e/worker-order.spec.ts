@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 
 // Live-версия против реального API http://127.0.0.1:8080 (через vite /api proxy).
@@ -5,6 +6,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function gotoLogin(page: Page) {
   await page.addInitScript(() => {
+    if (sessionStorage.getItem('e2e-worker-order-cleaned')) return;
+    sessionStorage.setItem('e2e-worker-order-cleaned', '1');
     localStorage.removeItem('naryadai.refresh');
     localStorage.removeItem('naryadai.cached-user.v1');
     localStorage.setItem('naryadai.lang', 'ru');
@@ -38,9 +41,6 @@ async function loginAsWorker(page: Page) {
   await expect(page).toHaveURL(/\/worker/, { timeout: 20000 });
 }
 
-// Прямые экшены без модальных форм (WorkerOrder: reject/pause/complete открывают формы).
-const DIRECT_ACTION = /Принять в работу|Начать|Продолжить|В очередь/;
-
 test('live: worker order page shows action button', async ({ page }) => {
   await loginAsWorker(page);
   // Первая карточка /worker → открыть живой наряд worker01.
@@ -57,46 +57,64 @@ test('live: worker order page shows action button', async ({ page }) => {
 
 test('live: online action posts real transition, card status changes', async ({ page }) => {
   await loginAsWorker(page);
-  await expect(page.locator('a[href*="/worker/orders/"]').first()).toBeVisible({ timeout: 20000 });
-  // Первая карточка с прямым экшеном (обычно первая же: у worker01 десятки issued/accepted).
-  let actionBtn = page.locator('.dock-sticky button').first();
-  let found = false;
-  for (let i = 0; i < 10 && !found; i += 1) {
-    await page.locator('a[href*="/worker/orders/"]').nth(i).click();
-    await expect(page).toHaveURL(/\/worker\/orders\//, { timeout: 20000 });
-    // Ждём ЛЮБОЙ исход рендера (кнопки / баннер «нет действий»), затем ищем прямой экшен.
-    const anyBtn = page.locator('.dock-sticky button').first();
-    await expect(anyBtn.or(page.getByText('Нет доступных действий'))).toBeVisible({
-      timeout: 20000,
+  // Own issued order makes this mutation independent of seed ordering and earlier runs.
+  const masterLogin = await page.request.post('/api/v1/auth/login', {
+    data: { login: 'master1', pin: '3333' },
+  });
+  expect(masterLogin.status()).toBe(200);
+  const masterHeaders = { Authorization: `Bearer ${(await masterLogin.json()).access_token}` };
+  const workerLogin = await page.request.post('/api/v1/auth/login', {
+    data: { login: 'worker01', pin: '1001' },
+  });
+  expect(workerLogin.status()).toBe(200);
+  const workerHeaders = { Authorization: `Bearer ${(await workerLogin.json()).access_token}` };
+  const meResponse = await page.request.get('/api/v1/me', { headers: workerHeaders });
+  expect(meResponse.status()).toBe(200);
+  const me = await meResponse.json();
+  const equipmentResponse = await page.request.get(`/api/v1/equipment?area_id=${me.area_ids[0]}`, {
+    headers: masterHeaders,
+  });
+  expect(equipmentResponse.status()).toBe(200);
+  const body = await equipmentResponse.json();
+  const equipmentId = (Array.isArray(body) ? body : (body.items ?? body.data))[0]?.id;
+  expect(equipmentId).toBeTruthy();
+  const created = await page.request.post('/api/v1/work-orders', {
+    headers: { ...masterHeaders, 'Idempotency-Key': randomUUID() },
+    data: {
+      kind: 'unplanned',
+      description: `e2e-isolated-action-${randomUUID()}`,
+      equipment_id: equipmentId,
+      assignee_id: me.id,
+      priority: 'high',
+      due_at: new Date(Date.now() + 3600000).toISOString(),
+      norm_minutes: 60,
+      equipment_stopped: false,
+    },
+  });
+  expect(created.status()).toBe(201);
+  const orderId = (await created.json()).id;
+  try {
+    await page.goto(`/worker/orders/${orderId}`);
+    const accept = page.getByRole('button', { name: 'Принять в работу', exact: true });
+    await expect(accept).toBeVisible({ timeout: 20000 });
+    const posted = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/work-orders/${orderId}/transitions`) &&
+        response.request().method() === 'POST',
+    );
+    await accept.click();
+    expect((await posted).status()).toBe(200);
+    await expect(page.getByText('Принят', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Начать', exact: true })).toBeEnabled();
+    const saved = await page.request.get(`/api/v1/work-orders/${orderId}`, {
+      headers: workerHeaders,
     });
-    actionBtn = page.locator('.dock-sticky button').filter({ hasText: DIRECT_ACTION }).first();
-    found = (await actionBtn.count()) > 0;
-    // SPA-назад: page.goto перезагрузил бы документ и addInitScript guard стёр бы refresh из localStorage.
-    if (!found) {
-      await page.goBack();
-      await expect(page).toHaveURL(/\/worker$/, { timeout: 20000 });
-    }
-  }
-  expect(found).toBeTruthy();
-  await expect(actionBtn).toBeEnabled({ timeout: 15000 });
-  const dockBefore = await page.locator('.dock-sticky').innerText();
-  // Реальный POST живому API — без page.route.
-  const posted = page.waitForResponse(
-    (r) =>
-      r.url().includes('/work-orders/') &&
-      r.url().includes('/transitions') &&
-      r.request().method() === 'POST',
-    { timeout: 20000 },
-  );
-  await actionBtn.click();
-  const resp = await posted;
-  if (resp.ok()) {
-    // Смена статуса карточки: набор кнопок dock изменился после рефетча заказа.
-    await expect
-      .poll(async () => page.locator('.dock-sticky').innerText(), { timeout: 20000 })
-      .not.toBe(dockBefore);
-  } else {
-    // Параллельный прогон мог сменить состояние раньше нас — главное, что POST ушёл и UI жив.
-    await expect(page.locator('.dock-sticky, .banner').first()).toBeVisible({ timeout: 15000 });
+    expect((await saved.json()).status).toBe('accepted');
+  } finally {
+    const cleanup = await page.request.post(`/api/v1/work-orders/${orderId}/transitions`, {
+      headers: masterHeaders,
+      data: { action: 'cancel', reason_code: 'duplicate', client_at: new Date().toISOString() },
+    });
+    expect(cleanup.status()).toBe(200);
   }
 });

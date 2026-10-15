@@ -37,6 +37,8 @@ export function useRealtime(enabled = true) {
         // Баннер «связь восстановлена» — только после реального разрыва, прячем через 6с.
         if (attempt.current > 0) {
           setReconnected(true);
+          // The server does not replay missed frames; refresh all visible data after a gap.
+          void qc.invalidateQueries();
           clearTimeout(hideTimer);
           hideTimer = setTimeout(() => setReconnected(false), 6000);
         }
@@ -65,6 +67,11 @@ export function useRealtime(enabled = true) {
             lastSeq.current = data.seq;
           }
           if (!ev) return;
+          if (ev === 'WORKER_STATUS_CHANGED' || ev === 'employee.status_changed') {
+            void qc.invalidateQueries({ queryKey: ['workers'] });
+            void qc.invalidateQueries({ queryKey: ['board'] });
+            return;
+          }
           if (ev === 'WORK_ORDER_CREATED' || ev === 'order.created') {
             const payload = data.payload as { id?: string; number?: number } | undefined;
             if (payload?.id) {
@@ -86,6 +93,9 @@ export function useRealtime(enabled = true) {
           ) {
             void qc.invalidateQueries({ queryKey: ['orders'] });
             void qc.invalidateQueries({ queryKey: ['board'] });
+            if (ev.startsWith('order.') || ev.startsWith('WORK_ORDER')) {
+              void qc.invalidateQueries({ queryKey: ['workers'] });
+            }
             void qc.invalidateQueries({ queryKey: ['notifications'] });
             const p = data.payload as
               { id?: string; work_order_id?: string; order_id?: string } | undefined;

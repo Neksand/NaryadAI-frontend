@@ -274,6 +274,47 @@ describe('401 refresh interceptor', () => {
     expect(useAuthStore.getState().user?.id).toBe('u');
   });
 
+  it('does not restore tokens if a pending refresh completes after logout', async () => {
+    const mod = await load(PRIMARY);
+    const { useAuthStore } = await import('../store/auth-store');
+    useAuthStore
+      .getState()
+      .setSession({ id: 'u', full_name: 'U', role: 'worker', area_ids: [] }, 'old', 'ref-1');
+    let finish!: (value: unknown) => void;
+    netMocks.axiosPost.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const pending = mod.refreshSession();
+    useAuthStore.getState().logout();
+    finish({ data: { access_token: 'late-access', refresh_token: 'late-refresh' } });
+    await expect(pending).resolves.toBeNull();
+    expect(mod.getAccessToken()).toBeNull();
+    expect(mod.getRefreshToken()).toBeNull();
+    expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  it('does not log a new account out when an old refresh is rejected', async () => {
+    const mod = await load(PRIMARY);
+    const { useAuthStore } = await import('../store/auth-store');
+    const user = (id: string) => ({ id, full_name: id, role: 'worker' as const, area_ids: [] });
+    useAuthStore.getState().setSession(user('a'), 'old-a', 'refresh-a');
+    let reject!: (error: unknown) => void;
+    netMocks.axiosPost.mockReturnValue(
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      }),
+    );
+    const pending = mod.refreshSession();
+    useAuthStore.getState().setSession(user('b'), 'access-b', 'refresh-b');
+    reject(new AxiosError('old refresh rejected', { response: { status: 401, data: {} } }));
+    await expect(pending).resolves.toBeNull();
+    expect(mod.getAccessToken()).toBe('access-b');
+    expect(mod.getRefreshToken()).toBe('refresh-b');
+    expect(useAuthStore.getState().user?.id).toBe('b');
+  });
+
   it('passes through non-401 errors', async () => {
     await load(PRIMARY);
     const rej = netMocks.resHandlers[1] as (e: unknown) => Promise<unknown>;

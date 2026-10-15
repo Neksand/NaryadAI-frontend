@@ -14,6 +14,8 @@ vi.mock('idb-keyval', () => ({
 
 vi.mock('../api/workOrders', () => ({ transitionOrder: transitionMock }));
 
+import { useAuthStore } from '../store/auth-store';
+
 import { useOfflineQueue } from './useOfflineQueue';
 
 const wrapper = ({ children }: PropsWithChildren) =>
@@ -24,6 +26,7 @@ const wrapper = ({ children }: PropsWithChildren) =>
   );
 
 beforeEach(() => {
+  useAuthStore.getState().logout();
   store.clear();
   vi.clearAllMocks();
 });
@@ -33,14 +36,14 @@ describe('useOfflineQueue lifecycle', () => {
     const saved = [
       { key: 'k1', orderId: 'o1', action: 'accept', body: {}, clientAt: new Date().toISOString() },
     ];
-    store.set('naryadai.offline-queue', saved);
+    store.set('naryadai.offline-queue:anonymous', saved);
     const { result } = renderHook(() => useOfflineQueue(), { wrapper });
     await waitFor(() => expect(result.current.queue).toEqual(saved));
     expect(result.current.count).toBe(1);
   });
 
   it('auto-replays when browser comes back online', async () => {
-    store.set('naryadai.offline-queue', [
+    store.set('naryadai.offline-queue:anonymous', [
       { key: 'k1', orderId: 'o1', action: 'start', body: {}, clientAt: new Date().toISOString() },
     ]);
     const { result } = renderHook(() => useOfflineQueue(), { wrapper });
@@ -85,4 +88,38 @@ describe('useOfflineQueue lifecycle', () => {
     });
     expect(result.current.online).toBe(false);
   });
+});
+
+it('isolates pending mutations and notices when employees share one phone', async () => {
+  const user = (id: string) => ({
+    id,
+    login: id,
+    full_name: id,
+    role: 'worker' as const,
+    area_ids: [],
+  });
+  act(() => useAuthStore.getState().setSession(user('worker-a'), 'token-a'));
+  const { result } = renderHook(() => useOfflineQueue(), { wrapper });
+  await act(async () => {
+    await result.current.enqueue({
+      key: 'private-a',
+      orderId: 'order-a',
+      action: 'accept',
+      body: {},
+      clientAt: new Date().toISOString(),
+    });
+  });
+  expect(result.current.queue).toHaveLength(1);
+  act(() => useAuthStore.getState().setSession(user('worker-b'), 'token-b'));
+  await waitFor(() => expect(result.current.queue).toHaveLength(0));
+  await act(async () => {
+    await result.current.replay();
+  });
+  expect(transitionMock).not.toHaveBeenCalled();
+  act(() => useAuthStore.getState().setSession(user('worker-a'), 'token-a'));
+  await waitFor(() => expect(result.current.queue).toHaveLength(1));
+  await act(async () => {
+    await result.current.replay();
+  });
+  expect(transitionMock).toHaveBeenCalledWith('order-a', 'accept', {}, 'private-a');
 });

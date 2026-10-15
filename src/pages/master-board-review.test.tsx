@@ -101,7 +101,7 @@ describe('MasterReview', () => {
     status: 'ai_review',
     priority: 'high',
     description: 'Ремонт',
-    allowed_actions: ['close'],
+    allowed_actions: ['close', 'return_to_rework'],
   };
 
   function renderReview() {
@@ -151,6 +151,18 @@ describe('MasterReview', () => {
     );
   });
 
+  it('uses the server rework verdict in the confirmation label', async () => {
+    woMocks.getWorkOrder.mockResolvedValue(order);
+    inspectionMock.mockResolvedValue({
+      verdict: 'needs_rework',
+      score: 20,
+      explanation: 'Нужна доработка',
+    });
+    renderAt('/master/review/o1', '/master/review/:id', <MasterReview />);
+    expect(await screen.findByRole('button', { name: 'Согласен — на доработку' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Согласен — закрыть' })).toBeNull();
+  });
+
   it('shows pending banner when review is not ready', async () => {
     woMocks.getWorkOrder.mockResolvedValue(order);
     inspectionMock.mockRejectedValue(new Error('pending'));
@@ -158,5 +170,47 @@ describe('MasterReview', () => {
     await waitFor(() => expect(screen.getByText('ИИ-проверка ещё идёт, подождите…')).toBeTruthy(), {
       timeout: 4000,
     });
+    expect(screen.getByRole('button', { name: 'Согласен — закрыть' })).toBeDisabled();
   });
+});
+
+it('requires a human score and comment when AI abstains', async () => {
+  const u = userEvent.setup();
+  woMocks.getWorkOrder.mockResolvedValue({
+    id: 'o1',
+    number: 3,
+    status: 'ai_review',
+    priority: 'high',
+    description: 'Ремонт',
+    allowed_actions: ['close', 'return_to_rework'],
+  });
+  inspectionMock.mockResolvedValue({
+    verdict: 'needs_master_review',
+    score: null,
+    confidence: 0.52,
+    explanation: 'Недостаточно данных',
+  });
+  renderAt('/master/review/o1', '/master/review/:id', <MasterReview />);
+  await screen.findByText('Недостаточно данных');
+  expect(screen.getByRole('button', { name: 'Согласен — закрыть' })).toBeDisabled();
+  const manual = screen.getByRole('button', { name: 'Принять со своей оценкой' });
+  expect(manual).toBeDisabled();
+  await u.type(screen.getByLabelText('Оценка мастера (0–100)'), '101');
+  await u.type(
+    screen.getByPlaceholderText('Для доработки нужен комментарий'),
+    'Результат проверен лично',
+  );
+  expect(manual).toBeDisabled();
+  await u.clear(screen.getByLabelText('Оценка мастера (0–100)'));
+  await u.type(screen.getByLabelText('Оценка мастера (0–100)'), '85');
+  await u.click(manual);
+  await waitFor(() =>
+    expect(woMocks.reviewDecision).toHaveBeenCalledWith(
+      'o1',
+      'override',
+      85,
+      'Результат проверен лично',
+      expect.any(String),
+    ),
+  );
 });

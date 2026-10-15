@@ -54,16 +54,22 @@ export default function App() {
   useEffect(() => {
     const retryOfflineSession = () => {
       const store = useAuthStore.getState();
-      if (!store.user || store.accessToken || !getRefreshToken()) return;
-      void refreshSession().then(async (access) => {
-        if (!access) return;
-        try {
+      const refresh = getRefreshToken();
+      if (!store.user || store.accessToken || !refresh) return;
+      const userId = store.user.id;
+      void refreshSession()
+        .then(async (access) => {
+          if (!access) return;
+          const resumedRefresh = getRefreshToken();
           const user = await fetchMe();
+          // A delayed reconnect must not restore a session after logout or account change.
+          if (useAuthStore.getState().user?.id !== userId || getRefreshToken() !== resumedRefresh)
+            return;
           useAuthStore.getState().setSession(user, access, getRefreshToken());
-        } catch {
+        })
+        .catch(() => {
           // Leave the read-only cached identity available if the API is still down.
-        }
-      });
+        });
     };
     window.addEventListener('online', retryOfflineSession);
     return () => window.removeEventListener('online', retryOfflineSession);

@@ -245,9 +245,13 @@ test('live: before-photo upload shows count chip', async ({ page }) => {
   await expect(page.getByText('Фото «до»').first()).toBeVisible({ timeout: 20000 });
 
   // Лимит на клиенте: input принимает только изображения.
-  await expect(page.locator('input[type="file"]')).toHaveAttribute('accept', 'image/*', {
-    timeout: 20000,
-  });
+  await expect(page.locator('input[type="file"]')).toHaveAttribute(
+    'accept',
+    'image/jpeg,image/png,image/webp',
+    {
+      timeout: 20000,
+    },
+  );
 
   const posted = page.waitForResponse(
     (r) => r.url().endsWith('/api/v1/photos') && r.request().method() === 'POST',

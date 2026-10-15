@@ -110,6 +110,7 @@ export default function LoginPage() {
           <span className="label">{t('auth.pin')}</span>
           <input
             className="input mono"
+            type="password"
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
             inputMode="numeric"

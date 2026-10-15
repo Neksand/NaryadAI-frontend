@@ -2,6 +2,7 @@ import { get, set } from 'idb-keyval';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../store/auth-store';
 
 export interface QueuedOp {
   key: string; // Idempotency-Key — ONE UUID per logical mutation, reused on retry
@@ -27,6 +28,11 @@ const NOTICE_KEY = 'naryadai.offline-notices';
 /** Offline queue for worker mutations. Same Idempotency-Key is reused for the same op. */
 export function useOfflineQueue() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id ?? 'anonymous');
+  // A shared phone must never replay one employee's actions as the next user.
+  // Unscoped legacy queues cannot be safely attributed and are not replayed.
+  const storeKey = `${STORE_KEY}:${userId}`;
+  const noticeKey = `${NOTICE_KEY}:${userId}`;
   const [queue, setQueue] = useState<QueuedOp[]>([]);
   const [notices, setNotices] = useState<QueueNotice[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
@@ -34,23 +40,29 @@ export function useOfflineQueue() {
   const [lastReplayError, setLastReplayError] = useState<string | null>(null);
   const replayLock = useRef(false);
 
-  const persist = useCallback(async (q: QueuedOp[]) => {
-    setQueue(q);
-    await set(STORE_KEY, q);
-  }, []);
+  const persist = useCallback(
+    async (q: QueuedOp[]) => {
+      setQueue(q);
+      await set(storeKey, q);
+    },
+    [storeKey],
+  );
 
-  const persistNotices = useCallback(async (items: QueueNotice[]) => {
-    const bounded = items.slice(-20);
-    setNotices(bounded);
-    await set(NOTICE_KEY, bounded);
-  }, []);
+  const persistNotices = useCallback(
+    async (items: QueueNotice[]) => {
+      const bounded = items.slice(-20);
+      setNotices(bounded);
+      await set(noticeKey, bounded);
+    },
+    [noticeKey],
+  );
 
   const remove = useCallback(
     async (key: string) => {
-      const current = (await get<QueuedOp[]>(STORE_KEY)) ?? [];
+      const current = (await get<QueuedOp[]>(storeKey)) ?? [];
       await persist(current.filter((o) => o.key !== key));
     },
-    [persist],
+    [persist, storeKey],
   );
 
   // Повторная отправка очереди тем же Idempotency-Key — дублей не будет.
@@ -64,7 +76,7 @@ export function useOfflineQueue() {
     let sent = 0;
     let failed = 0;
     try {
-      const current = (await get<QueuedOp[]>(STORE_KEY)) ?? [];
+      const current = (await get<QueuedOp[]>(storeKey)) ?? [];
       // Отсекаем протухшие и повреждённые записи; сервер тоже проверяет client_at.
       const fresh = current.filter((o) => {
         const age = Date.now() - new Date(o.clientAt).getTime();
@@ -78,6 +90,7 @@ export function useOfflineQueue() {
 
       const { transitionOrder } = await import('../api/workOrders');
       for (const op of fresh) {
+        if ((useAuthStore.getState().user?.id ?? 'anonymous') !== userId) break;
         try {
           await transitionOrder(op.orderId, op.action, op.body ?? {}, op.key);
           await remove(op.key);
@@ -119,7 +132,7 @@ export function useOfflineQueue() {
               occurredAt: new Date().toISOString(),
             };
             await remove(op.key);
-            const savedNotices = (await get<QueueNotice[]>(NOTICE_KEY)) ?? [];
+            const savedNotices = (await get<QueueNotice[]>(noticeKey)) ?? [];
             await persistNotices([...savedNotices, notice]);
             void queryClient.invalidateQueries({ queryKey: ['orders', 'my'] });
             void queryClient.invalidateQueries({ queryKey: ['order', op.orderId] });
@@ -132,21 +145,25 @@ export function useOfflineQueue() {
       }
     } finally {
       try {
-        if (started) setQueue((await get<QueuedOp[]>(STORE_KEY)) ?? []);
+        if (started) setQueue((await get<QueuedOp[]>(storeKey)) ?? []);
       } finally {
         if (started) setReplaying(false);
         replayLock.current = false;
       }
     }
     return { sent, failed };
-  }, [persist, remove, persistNotices, queryClient]);
+  }, [persist, remove, persistNotices, queryClient, storeKey, noticeKey, userId]);
 
   useEffect(() => {
-    void get<QueuedOp[]>(STORE_KEY).then((q) => {
-      if (q) setQueue(q);
+    let active = true;
+    setQueue([]);
+    setNotices([]);
+    setLastReplayError(null);
+    void get<QueuedOp[]>(storeKey).then((q) => {
+      if (active) setQueue(q ?? []);
     });
-    void get<QueueNotice[]>(NOTICE_KEY).then((items) => {
-      if (items) setNotices(items);
+    void get<QueueNotice[]>(noticeKey).then((items) => {
+      if (active) setNotices(items ?? []);
     });
     const on = () => {
       setOnline(true);
@@ -156,28 +173,29 @@ export function useOfflineQueue() {
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
     return () => {
+      active = false;
       window.removeEventListener('online', on);
       window.removeEventListener('offline', off);
     };
-  }, [replay]);
+  }, [replay, storeKey, noticeKey]);
 
   const enqueue = useCallback(
     async (op: QueuedOp) => {
-      const current = (await get<QueuedOp[]>(STORE_KEY)) ?? [];
+      const current = (await get<QueuedOp[]>(storeKey)) ?? [];
       // A key names one immutable logical operation; repeated UI events must not
       // enqueue a second payload under the same key.
       if (current.some((queued) => queued.key === op.key)) return;
       await persist([...current, op]);
     },
-    [persist],
+    [persist, storeKey],
   );
 
   const dismissNotice = useCallback(
     async (key: string) => {
-      const current = (await get<QueueNotice[]>(NOTICE_KEY)) ?? [];
+      const current = (await get<QueueNotice[]>(noticeKey)) ?? [];
       await persistNotices(current.filter((notice) => notice.key !== key));
     },
-    [persistNotices],
+    [persistNotices, noticeKey],
   );
 
   return {

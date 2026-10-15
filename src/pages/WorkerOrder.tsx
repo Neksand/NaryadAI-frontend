@@ -23,6 +23,7 @@ import { pickName } from '../lib/names';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import { Icon } from '../components/Icon';
 import { OfflineQueuePanel } from '../components/OfflineQueuePanel';
+import { OrderAssessment, OrderPhotos } from '../components/OrderEvidence';
 import { DeadlineTimer } from '../components/WorkerOrderCard';
 
 const ACTION_LABEL: Record<string, string> = {
@@ -72,6 +73,11 @@ export default function WorkerOrder() {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [workDone, setWorkDone] = useState('');
   const [faultCodeId, setFaultCodeId] = useState('');
+  const [completionComment, setCompletionComment] = useState('');
+  const [equipmentRestored, setEquipmentRestored] = useState(true);
+  const [usedMaterials, setUsedMaterials] = useState<
+    { key: string; material_id: string; quantity: string }[]
+  >([]);
   const [afterPct, setAfterPct] = useState<number | null>(null);
   const [afterDone, setAfterDone] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -93,6 +99,20 @@ export default function WorkerOrder() {
     enabled: completing,
     staleTime: 60000,
   });
+  const materials = useQuery({
+    queryKey: ['catalog', 'materials'],
+    queryFn: () => dictList('materials'),
+    enabled: completing,
+    staleTime: 60000,
+    networkMode: 'always',
+  });
+  const invalidMaterials = usedMaterials.some(
+    (item) =>
+      !item.material_id ||
+      !Number.isFinite(Number(item.quantity)) ||
+      Number(item.quantity) <= 0 ||
+      Number(item.quantity) > 1_000_000,
+  );
   const orderPhotos = useQuery({
     queryKey: ['order', id, 'photos'],
     queryFn: () => listOrderPhotos(id),
@@ -142,6 +162,7 @@ export default function WorkerOrder() {
   });
 
   const closeSheet = () => {
+    if (transition.isPending || (afterPct !== null && afterPct < 100)) return;
     setPendingAction(null);
     setReasonCode('');
     setReasonComment('');
@@ -200,7 +221,7 @@ export default function WorkerOrder() {
       </div>
 
       {/* Primary actions from allowed_actions */}
-      {!completing && actions.length === 0 && (
+      {!completing && actions.length === 0 && !['closed', 'cancelled'].includes(o.status) && (
         <div className="banner banner-warn flex gap-2 items-center" role="status">
           <span className="flex-1">{t('worker.noActions')}</span>
           <button className="btn btn-sm" onClick={invalidate}>
@@ -232,6 +253,7 @@ export default function WorkerOrder() {
           <div
             className="modal-card"
             role="dialog"
+            aria-modal="true"
             aria-label={t('worker.reasonTitle')}
             onClick={(e) => e.stopPropagation()}
           >
@@ -261,8 +283,11 @@ export default function WorkerOrder() {
               placeholder={t('worker.extraComment')}
               aria-label={t('worker.extraComment')}
             />
+            {transition.isError && (
+              <ErrorState message={toLocalizedError(transition.error).message} />
+            )}
             <div className="flex gap-2">
-              <button className="btn" onClick={closeSheet}>
+              <button className="btn" onClick={closeSheet} disabled={transition.isPending}>
                 {t('common.cancel')}
               </button>
               <button
@@ -288,25 +313,28 @@ export default function WorkerOrder() {
           <div
             className="modal-card"
             role="dialog"
+            aria-modal="true"
             aria-label={t('worker.completeTitle')}
             onClick={(e) => e.stopPropagation()}
           >
             <b>{t('worker.completeTitle')}</b>
-            <label className="flex flex-col gap-1">
-              <span className="label">
-                {t('worker.workDone')} *{' '}
+            <div className="flex flex-col gap-1">
+              <div className="label">
+                <label htmlFor="completion-work-done">{t('worker.workDone')} *</label>{' '}
                 <VoiceButton
                   workOrderId={id}
                   onText={(txt) => setWorkDone((w) => (w ? w + ' ' : '') + txt)}
                 />
-              </span>
+              </div>
               <textarea
+                id="completion-work-done"
                 className="input area"
                 value={workDone}
                 onChange={(e) => setWorkDone(e.target.value)}
                 required
+                maxLength={4000}
               />
-            </label>
+            </div>
             <label className="flex flex-col gap-1">
               <span className="label">{t('worker.faultCode')} *</span>
               <select
@@ -355,6 +383,117 @@ export default function WorkerOrder() {
                 )}
               </>
             )}
+            <fieldset className="flex flex-col gap-2 min-w-0">
+              <legend className="label">{t('worker.materials')}</legend>
+              {materials.isPending && <span role="status">{t('common.loading')}</span>}
+              {materials.isError && (
+                <ErrorState
+                  message={toLocalizedError(materials.error).message}
+                  onRetry={() => materials.refetch()}
+                />
+              )}
+              {usedMaterials.map((item, index) => (
+                <div key={item.key} className="card !p-3 flex flex-col gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="label">
+                      {t('worker.material')} {index + 1}
+                    </span>
+                    <select
+                      className="input w-full"
+                      value={item.material_id}
+                      onChange={(e) =>
+                        setUsedMaterials((items) =>
+                          items.map((row) =>
+                            row.key === item.key ? { ...row, material_id: e.target.value } : row,
+                          ),
+                        )
+                      }
+                    >
+                      <option value="">—</option>
+                      {(
+                        (materials.data ?? []) as {
+                          id: string;
+                          name: string;
+                          name_kk?: string;
+                          unit: string;
+                        }[]
+                      ).map((material) => (
+                        <option
+                          key={material.id}
+                          value={material.id}
+                          disabled={usedMaterials.some(
+                            (row) => row.key !== item.key && row.material_id === material.id,
+                          )}
+                        >
+                          {pickName(material, (i18n.language || 'ru').slice(0, 2)) || material.name}{' '}
+                          · {material.unit}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="label">
+                      {t('worker.quantity')} {index + 1}
+                    </span>
+                    <input
+                      className="input"
+                      type="number"
+                      inputMode="decimal"
+                      min="0.001"
+                      max="1000000"
+                      step="any"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        setUsedMaterials((items) =>
+                          items.map((row) =>
+                            row.key === item.key ? { ...row, quantity: e.target.value } : row,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <button
+                    className="btn btn-danger-o"
+                    onClick={() =>
+                      setUsedMaterials((items) => items.filter((row) => row.key !== item.key))
+                    }
+                    aria-label={`${t('worker.removeMaterial')} ${index + 1}`}
+                  >
+                    {t('worker.removeMaterial')}
+                  </button>
+                </div>
+              ))}
+              <button
+                className="btn"
+                disabled={materials.isPending || materials.isError || usedMaterials.length >= 100}
+                onClick={() =>
+                  setUsedMaterials((items) => [
+                    ...items,
+                    { key: newUUID(), material_id: '', quantity: '1' },
+                  ])
+                }
+              >
+                {t('worker.addMaterial')}
+              </button>
+              {invalidMaterials && <span role="note">{t('worker.invalidMaterial')}</span>}
+            </fieldset>
+            <label className="flex flex-col gap-1">
+              <span className="label">{t('worker.extraComment')}</span>
+              <input
+                className="input"
+                value={completionComment}
+                maxLength={4000}
+                onChange={(e) => setCompletionComment(e.target.value)}
+              />
+            </label>
+            <label className="flex gap-2 items-center min-h-[48px]">
+              <input
+                type="checkbox"
+                checked={equipmentRestored}
+                onChange={(e) => setEquipmentRestored(e.target.checked)}
+              />
+              {t('worker.restored')}
+            </label>
             <div className="flex flex-col gap-1">
               <span className="label">{t('worker.afterPhotos')}</span>
               <label className="file-btn">
@@ -363,6 +502,7 @@ export default function WorkerOrder() {
                   type="file"
                   className="hidden"
                   accept="image/jpeg,image/png,image/webp"
+                  disabled={afterPct !== null && afterPct < 100}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) void onPhoto(f, 'after');
@@ -392,22 +532,36 @@ export default function WorkerOrder() {
                   {t('worker.needAfterPhoto')}
                 </div>
               )}
+            {transition.isError && (
+              <ErrorState message={toLocalizedError(transition.error).message} />
+            )}
             <div className="flex gap-2">
-              <button className="btn" onClick={closeSheet}>
+              <button className="btn" onClick={closeSheet} disabled={transition.isPending}>
                 {t('common.cancel')}
               </button>
               <button
                 className="btn btn-ok grow"
-                disabled={!workDone.trim() || !faultCodeId || transition.isPending}
+                disabled={
+                  !workDone.trim() ||
+                  !faultCodeId ||
+                  invalidMaterials ||
+                  transition.isPending ||
+                  (afterPct !== null && afterPct < 100)
+                }
                 onClick={() =>
                   transition.mutate({
                     action: 'complete',
                     body: {
+                      comment: completionComment.trim() || undefined,
                       form: {
                         work_done_text: workDone.trim(),
                         fault_code_id: faultCodeId,
-                        materials: [],
-                        equipment_restored: true,
+                        materials: usedMaterials.map(({ material_id, quantity }) => ({
+                          material_id,
+                          quantity: Number(quantity),
+                        })),
+                        equipment_restored: equipmentRestored,
+                        comment: completionComment.trim() || undefined,
                       },
                     },
                   })
@@ -420,7 +574,9 @@ export default function WorkerOrder() {
         </div>
       )}
 
-      {transition.isError && <ErrorState message={toLocalizedError(transition.error).message} />}
+      {!pendingAction && transition.isError && (
+        <ErrorState message={toLocalizedError(transition.error).message} />
+      )}
       {'queued' in (transition.data ?? {}) && (
         <div className="banner banner-warn" role="status">
           {t('common.offline')} · {t('common.queued')}
@@ -440,11 +596,21 @@ export default function WorkerOrder() {
         onDismiss={(key) => void offline.dismissNotice(key)}
       />
 
+      <OrderAssessment review={o.ai_review} />
+      <OrderPhotos photos={o.photos} />
       <section>
         <h3 className="sec-h">{t('common.timeline')}</h3>
         {Array.isArray(events.data) && events.data.length > 0 ? (
           <ol className="flex flex-col gap-2">
-            {(events.data as { action?: string; at?: string; actor?: string }[])
+            {(
+              events.data as {
+                action?: string;
+                at?: string;
+                actor?: string;
+                actor_id?: string;
+                comment?: string;
+              }[]
+            )
               .slice(0, 20)
               .map((e, i) => (
                 <li key={i} className="card !p-3 text-sm">
@@ -453,7 +619,8 @@ export default function WorkerOrder() {
                   {e.action
                     ? t(`action.${e.action}`, { defaultValue: t(`status.${e.action}`, e.action) })
                     : ''}{' '}
-                  · {e.actor ?? ''}
+                  · {e.actor ?? (e.actor_id ? (names.users.get(e.actor_id) ?? e.actor_id) : '')}
+                  {e.comment && <p>{e.comment}</p>}
                 </li>
               ))}
           </ol>

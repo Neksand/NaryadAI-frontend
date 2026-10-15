@@ -9,10 +9,9 @@ test.setTimeout(60_000);
 //
 // Приватность фото: бэкенд отдаёт приватные оригиналы только через
 // signed URL (GET /photos/:id/url с expires_in), чужие фото — 404.
-// photoUrl() нигде не рендерит <img> напрямую — контракт проверяем живым
-// fetch в контексте страницы (Bearer приложения через снифф исходящих
-// запросов — без ротации refresh и убийства UI-сессии) + видимое
-// UI-состояние, без скриншотов.
+// Владелец видит доказательства через временные подписанные URL.
+// Проверяем выдачу URL с авторизацией, отказ анониму и отсутствие
+// сохранения временных ссылок в localStorage.
 // МУТАЦИИ — только строго изолированные: свой наряд с уникальным описанием
 // e2e-privacy-* (master1 через API → worker01), доводим accept/start через API
 // отдельным worker-логином, after-фото грузим без submit завершения, затем
@@ -351,7 +350,9 @@ test('live: foreign photo signed URL is denied with 404 and UI stays intact', as
   await expect(page).toHaveURL(/\/worker\/orders\//, { timeout: 15000 });
 });
 
-test('live: signed URL is not embedded into UI as a plain img', async ({ page }) => {
+test('live: owner sees private photo evidence while anonymous URL requests are denied', async ({
+  page,
+}) => {
   await loginAsWorker(page);
   const orderId = await setupOwnOrder(page, 'privacy');
   expect(await openOwnCompleteDialog(page, orderId)).toBe(true);
@@ -361,10 +362,29 @@ test('live: signed URL is not embedded into UI as a plain img', async ({ page })
   test.skip(!photoId, 'live stand: after-photo upload did not return an id');
   const signed = await apiGet(page, `/photos/${photoId}/url`, apiToken as string);
   const url = String((signed?.json as { url?: string } | null)?.url ?? '');
-  test.skip(!url, 'live stand: no signed url returned');
-  // Диалог завершения не встраивает подписанную ссылку как картинку.
-  await expect(page.getByRole('dialog', { name: 'Завершение наряда' })).toBeVisible({
+  expect(signed?.status).toBe(200);
+  expect(url).toMatch(/^https?:\/\//);
+  const anonymous = await page.request.get(`/api/v1/photos/${photoId}/url`);
+  expect(anonymous.status()).toBe(401);
+  const dialog = page.getByRole('dialog', { name: 'Завершение наряда' });
+  await expect(dialog).toBeVisible({
     timeout: 20000,
   });
-  await expect(page.locator(`img[src="${url}"]`)).toHaveCount(0, { timeout: 15000 });
+  await dialog.getByRole('button', { name: 'Отмена', exact: true }).click();
+  const photo = page.getByRole('region', { name: 'Фото до и после' }).getByRole('img').first();
+  await expect(photo).toBeVisible({ timeout: 15000 });
+  await expect
+    .poll(() =>
+      photo.evaluate(
+        (image) =>
+          (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
+  expect(
+    await page.evaluate(
+      (signedUrl) => Object.values(localStorage).some((value) => value.includes(signedUrl)),
+      url,
+    ),
+  ).toBe(false);
 });

@@ -538,6 +538,11 @@ body {
   font-weight: 700;
   margin-bottom: 8px;
 }
+.app-header .btn,
+.app-header .lang-select {
+  min-height: 44px;
+  min-width: 44px;
+}
 .modal-scrim {
   position: fixed;
   inset: 0;

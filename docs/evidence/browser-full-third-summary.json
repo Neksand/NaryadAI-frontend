@@ -1,0 +1,909 @@
+{
+  "run": "third-full-matrix",
+  "stats": {
+    "startTime": "2026-10-14T17:18:42.595Z",
+    "duration": 139837.43,
+    "expected": 147,
+    "skipped": 1,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "tests": [
+    {
+      "file": "action-clarity.spec.ts",
+      "name": "live: master order shows buttons only from live allowed_actions",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "action-clarity.spec.ts",
+      "name": "live: reassign requires an explicit assignee before sending",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "action-clarity.spec.ts",
+      "name": "live: unavailable action is absent from a closed order view",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "admin-employees.spec.ts",
+      "name": "live: admin employees list is non-empty",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "admin-employees.spec.ts",
+      "name": "live: admin create form validates empty PIN (no submit)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "admin-employees.spec.ts",
+      "name": "live: create e2e-employee -> reset PIN -> delete (cleanup)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "admin-layout.spec.ts",
+      "name": "live: admin dict tabs keep bedding on desktop width",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "admin-layout.spec.ts",
+      "name": "live: admin employee form holds layout on narrow width",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "admin-layout.spec.ts",
+      "name": "live: admin create forms do not break across dict tabs",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "ai-review.spec.ts",
+      "name": "live: master sees AI review verdict before decision",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "ai-review.spec.ts",
+      "name": "live: master can close from review (decision button visible)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "analytics-edgecases.spec.ts",
+      "name": "live: ratings section renders with live data or empty state",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "analytics-edgecases.spec.ts",
+      "name": "live: analytics shows no blocking alert, or alert pairs with retry",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "analytics-edgecases.spec.ts",
+      "name": "live: reload after analytics load keeps page alive",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "analytics-summary.spec.ts",
+      "name": "live: analytics summary is readable with live data",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "analytics-summary.spec.ts",
+      "name": "live: analytics survives load — no fatal alert, or retry offered",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "analytics-summary.spec.ts",
+      "name": "live: reload shows live summary again (no stale crash)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "analytics.spec.ts",
+      "name": "live: manager analytics tabs are reachable",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "analytics.spec.ts",
+      "name": "live: manager trend chart renders without errors",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "app-preferences.spec.ts",
+      "name": "live: language RU/KZ persists without dropping login",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "app-preferences.spec.ts",
+      "name": "live: chosen language survives reload with session intact",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "app-preferences.spec.ts",
+      "name": "live: board display preference survives reload",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "assistant-limits.spec.ts",
+      "name": "live: suggest returns candidates, apply fills assignee (max 3 cards)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "assistant-limits.spec.ts",
+      "name": "live: AI button is gated without description, form stays usable",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "assistant-limits.spec.ts",
+      "name": "live: issue form stays submittable with manual crew when AI is skipped",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "auth.spec.ts",
+      "name": "anonymous user sees login form on /login",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "auth.spec.ts",
+      "name": "live: master1/3333 login -> redirect to /master",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "auth.spec.ts",
+      "name": "live: unknown login shows alert and stays on /login",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "auth.spec.ts",
+      "name": "live: worker01 opening /manager is redirected to role home",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "before-photos.spec.ts",
+      "name": "live: before-photo upload shows count chip",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "before-photos.spec.ts",
+      "name": "live: invalid file does not produce a count chip and UI stays stable",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "before-photos.spec.ts",
+      "name": "live: worker after-photo upload in complete dialog shows progress percent",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "brigade-assignment.spec.ts",
+      "name": "live: admin crews dictionary shows live brigades",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "brigade-assignment.spec.ts",
+      "name": "live: master sees live brigades in the crew select when issuing",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "brigade-assignment.spec.ts",
+      "name": "live: choosing a crew unlocks issuing (no submit, no mutation)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "brigade-recommendations.spec.ts",
+      "name": "live: suggestAssignee returns live candidates with apply",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "brigade-recommendations.spec.ts",
+      "name": "live: manual brigade choice keeps issuing available without AI (no submit)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "case-lifecycle.spec.ts",
+      "name": "case: master issues, worker accepts and completes with materials, master reviews",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "catalog-import.spec.ts",
+      "name": "live: dry-run bad file shows row-numbered errors, writes nothing",
+      "status": "skipped",
+      "skipReasons": [
+        "no live API stand — run backend e2e_stand + uvicorn first"
+      ]
+    },
+    {
+      "file": "catalog-import.spec.ts",
+      "name": "live: dry-run valid file shows rows without errors",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "catalog-import.spec.ts",
+      "name": "live: import valid file creates e2e-* records, then API cleanup",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "catalog.spec.ts",
+      "name": "live: admin catalog tabs switch and lists are non-empty",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "catalog.spec.ts",
+      "name": "live: admin tab survives reload (page recovers, tab reselectable)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "employees.spec.ts",
+      "name": "live: employees list shows live roster",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "employees.spec.ts",
+      "name": "live: employee create validates PIN before POST (no submit)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "employees.spec.ts",
+      "name": "live: create e2e-employee -> reset PIN -> delete (cleanup)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "equipment-qr.spec.ts",
+      "name": "live: карточка оборудования показывает инв-номер из живого списка",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "equipment-qr.spec.ts",
+      "name": "live: поиск по QR-токену открывает то же оборудование",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "equipment-qr.spec.ts",
+      "name": "live: невалидный QR-токен показывает ошибку",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "equipment-qr.spec.ts",
+      "name": "live: deep-link /equipment/:id стабилен после reload",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "fault-reports.spec.ts",
+      "name": "live: worker reject sends reason_code from live dict",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "fault-reports.spec.ts",
+      "name": "live: worker pause sends reason_code from live dict",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "fault-reports.spec.ts",
+      "name": "live: worker put-in-queue posts transition without reason dialog",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "forecast.spec.ts",
+      "name": "live: failure-forecast ranks the seed anomaly K-3 at the top",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "forecast.spec.ts",
+      "name": "live: manager sees the forecast panel",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "history-trends.spec.ts",
+      "name": "live: past repairs list or empty placeholder is visible",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "history-trends.spec.ts",
+      "name": "live: history section renders without crash (repeat banner if live data repeats)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "history-trends.spec.ts",
+      "name": "live: another order history renders placeholder or list",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "i18n.spec.ts",
+      "name": "live: переключение RU→KZ меняет ключевые строки",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "i18n.spec.ts",
+      "name": "live: язык держится после reload через localStorage",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "i18n.spec.ts",
+      "name": "live: Accept-Language уходит с API-запросом",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "live-smoke.spec.ts",
+      "name": "live: master1/3333 login -> 200 + redirect to /master",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "live-smoke.spec.ts",
+      "name": "live: worker01/1001 login -> own work orders visible",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "live-smoke.spec.ts",
+      "name": "live: wrong PIN -> inline error, no crash",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "loading-i18n.spec.ts",
+      "name": "live: worker home settles loading into live order cards",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "loading-i18n.spec.ts",
+      "name": "live: kazakh language persists without logout",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "login-layout.spec.ts",
+      "name": "login is usable at 320px without horizontal scrolling",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "login-layout.spec.ts",
+      "name": "login is usable at 390px without horizontal scrolling",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "login-layout.spec.ts",
+      "name": "login is usable at 768px without horizontal scrolling",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "login-layout.spec.ts",
+      "name": "login is usable at 1280px without horizontal scrolling",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "login-lockout.spec.ts",
+      "name": "live: wrong PIN on unknown login shows error without leaving login",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "login-lockout.spec.ts",
+      "name": "live: repeated wrong attempts on unknown login stay on /login, no crash",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "login-lockout.spec.ts",
+      "name": "live: successful login leads to role home",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "manager-areas.spec.ts",
+      "name": "live: manager areas shows heading and live data",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "manager-areas.spec.ts",
+      "name": "live: manager equipment shows heading and live data",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "manager-export.spec.ts",
+      "name": "live: ratings export creates a live job (queued/processing/download)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "manager-export.spec.ts",
+      "name": "live: from/to range is validated",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "manager-export.spec.ts",
+      "name": "live: export shows live progress or result text",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "master-assistant.spec.ts",
+      "name": "live: вопрос про просроченные — ответ со ссылкой на живой наряд",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "master-assistant.spec.ts",
+      "name": "live: повторный вопрос после reopen — история из 2 пар видна",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "master-board.spec.ts",
+      "name": "live: master board shows columns and order cards",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "master-board.spec.ts",
+      "name": "live: master board filter change does not crash",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "navigation.spec.ts",
+      "name": "live: deep link to a live order card opens after session restore",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "navigation.spec.ts",
+      "name": "live: back/forward between /worker and /notifications keeps session",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "navigation.spec.ts",
+      "name": "live: unknown route redirects to role home",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "notifications.spec.ts",
+      "name": "live: worker sees live notifications inbox",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "notifications.spec.ts",
+      "name": "live: notifications persist language without logout",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "offline-panel.spec.ts",
+      "name": "live: offline action queued, online replay sends it (success or 409)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "offline-panel.spec.ts",
+      "name": "live: delete button removes queued action",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "order-browsing.spec.ts",
+      "name": "live: history paginates with a show-more button",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "order-browsing.spec.ts",
+      "name": "live: active list sorts urgent first and urgent filter hides the rest",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "order-browsing.spec.ts",
+      "name": "live: active and history sections render cards or empty state",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "order-filters.spec.ts",
+      "name": "live: filters on /worker keep selection and narrow the list",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "order-filters.spec.ts",
+      "name": "live: queue tab shows live cards or EmptyState",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "order-labels.spec.ts",
+      "name": "live: worker sees own order statuses",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "order-labels.spec.ts",
+      "name": "live: worker cards expose role-specific actions",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "order-labels.spec.ts",
+      "name": "live: master sees own board actions and performers",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "photo-privacy.spec.ts",
+      "name": "live: signed photo URL response carries url and expires_in",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "photo-privacy.spec.ts",
+      "name": "live: foreign photo signed URL is denied with 404 and UI stays intact",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "photo-privacy.spec.ts",
+      "name": "live: owner sees private photo evidence while anonymous URL requests are denied",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "prevention-outcomes.spec.ts",
+      "name": "live: repeat fault is highlighted from live equipment history",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "prevention-outcomes.spec.ts",
+      "name": "live: closed order shows live review score",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "prevention-outcomes.spec.ts",
+      "name": "live: rework is visible in order timeline",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "prevention.spec.ts",
+      "name": "live: manager sees prevention insights from the live stand",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "prevention.spec.ts",
+      "name": "live: plan-order button from insight talks to the live stand",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "prevention.spec.ts",
+      "name": "live: manager sees insight read-only until worker is picked",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "quick-issue.spec.ts",
+      "name": "live: master sees the quick-issue form",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "quick-issue.spec.ts",
+      "name": "live: planned quick-issue with unique description redirects to its card",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "realtime.spec.ts",
+      "name": "live: offline shows the connection banner",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "realtime.spec.ts",
+      "name": "live: reconnect returns live data",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "realtime.spec.ts",
+      "name": "live: WS channel opens through the dev proxy (tolerant)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "repair-memory.spec.ts",
+      "name": "live: master draft survives opening AI recommendation panel",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "repair-memory.spec.ts",
+      "name": "live: worker complete-form draft survives AI fault-code suggestion",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "repair-memory.spec.ts",
+      "name": "live: worker draft survives photos refresh after after-photo upload",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "report-evidence.spec.ts",
+      "name": "live: shift/xlsx export completes and offers a download link",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "report-evidence.spec.ts",
+      "name": "live: default orders export settles (link or no-link status)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "report-evidence.spec.ts",
+      "name": "live: export shows live job lifecycle then settles",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "report-evidence.spec.ts",
+      "name": "live: pdf export surfaces the live backend failure text (no mocks)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "report-failures.spec.ts",
+      "name": "live: default orders/xlsx export completes with a download link",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "report-failures.spec.ts",
+      "name": "live: retrying export creates a second live job",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "roles.spec.ts",
+      "name": "live: worker01 is redirected from /admin to role home",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "roles.spec.ts",
+      "name": "live: manager1 is redirected from /master/new to role home",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "roles.spec.ts",
+      "name": "live: anonymous user is redirected to /login",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "security-403.spec.ts",
+      "name": "live: worker is redirected from /admin to worker home",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "security-403.spec.ts",
+      "name": "live: guests go to /login and master is redirected from /manager",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "security-403.spec.ts",
+      "name": "live: worker opening an unknown order sees ErrorState (404, живьём)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "suggestions.spec.ts",
+      "name": "live: suggestAssignee shows live candidates or stays stable",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "suggestions.spec.ts",
+      "name": "live: issuing the order works without AI and is cancelled after (cleanup)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "suggestions.spec.ts",
+      "name": "live: applying the AI candidate fills the assignee (or stable skip)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "ux.spec.ts",
+      "name": "live: login with surrounding spaces posts trimmed login (401, stays on /login)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "ux.spec.ts",
+      "name": "live: Enter key submits the login form",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "ux.spec.ts",
+      "name": "live: filter tabs switch and reset restores live orders",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "worker-history.spec.ts",
+      "name": "live: worker home shows completed section with live history",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "worker-history.spec.ts",
+      "name": "live: worker history route renders",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "worker-order.spec.ts",
+      "name": "live: worker order page shows action button",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "worker-order.spec.ts",
+      "name": "live: online action posts real transition, card status changes",
+      "status": "unexpected",
+      "skipReasons": []
+    },
+    {
+      "file": "worker-queue.spec.ts",
+      "name": "live: all-tab counter equals visible cards",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "worker-queue.spec.ts",
+      "name": "live: urgent-tab counter equals visible cards",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "worker-queue.spec.ts",
+      "name": "live: queue-tab counter equals visible cards",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workers-layout.spec.ts",
+      "name": "live: team names stay readable on desktop without horizontal overflow",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workers-layout.spec.ts",
+      "name": "live: team names stay readable on mobile without horizontal overflow",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workers-layout.spec.ts",
+      "name": "live: board cards stay readable on mobile without horizontal overflow",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workflow.spec.ts",
+      "name": "live: worker runs accept then start on a fresh order",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workflow.spec.ts",
+      "name": "live: worker completes an in-progress order with a work report",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workflow.spec.ts",
+      "name": "live: stale accept after server-side cancel shows an error",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workflows.spec.ts",
+      "name": "live: manager creates a filtered export and it settles with a file",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workflows.spec.ts",
+      "name": "live: worker queues an offline action, online replay sends it (success or 409)",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workload.spec.ts",
+      "name": "live: master board shows columns",
+      "status": "expected",
+      "skipReasons": []
+    },
+    {
+      "file": "workload.spec.ts",
+      "name": "live: overdue order is highlighted on the board",
+      "status": "expected",
+      "skipReasons": []
+    }
+  ]
+}

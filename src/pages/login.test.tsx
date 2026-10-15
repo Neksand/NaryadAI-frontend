@@ -53,6 +53,7 @@ describe('LoginPage form', () => {
     const u = userEvent.setup();
     renderLogin();
     const pin = screen.getByLabelText('ПИН') as HTMLInputElement;
+    expect(pin).toHaveAttribute('type', 'password');
     await u.type(pin, 'ab12cd34567890');
     expect(pin.value).toBe('12345678');
   });

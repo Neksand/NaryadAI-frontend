@@ -656,6 +656,7 @@ function GenericCreate({
   );
   const [gen, setGen] = useState<Record<string, string>>(defaults);
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
 
   const valid = fields.every((f) => {
     const v = (gen[f.key] ?? '').trim();
@@ -672,12 +673,16 @@ function GenericCreate({
       body[f.key] = NUM_KEYS.has(f.key) ? Number(v) : v;
     }
     setBusy(true);
+    setMessage('');
     try {
       await dictCreate(type, body);
       setGen(defaults);
+      setMessage(t('admin.savedOk'));
       onDone(t('admin.savedOk'));
     } catch (e) {
-      onDone(toLocalizedError(e).message);
+      const errorMessage = toLocalizedError(e).message;
+      setMessage(errorMessage);
+      onDone(errorMessage);
     } finally {
       setBusy(false);
     }
@@ -750,6 +755,11 @@ function GenericCreate({
       <button className="btn btn-primary" disabled={!valid || busy} onClick={submit}>
         {busy ? t('common.loading') : `${t('admin.create')} +`}
       </button>
+      {message && (
+        <span className="chip neutral" role="status">
+          {message}
+        </span>
+      )}
     </div>
   );
 }

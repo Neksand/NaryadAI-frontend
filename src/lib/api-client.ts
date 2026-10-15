@@ -91,6 +91,7 @@ api.interceptors.request.use((config) => {
 async function doRefresh(): Promise<string | null> {
   if (!refreshToken) return null;
   if (!refreshPromise) {
+    const sessionRefresh = refreshToken;
     refreshPromise = (async () => {
       // refresh идёт по активной базе; при сетевой ошибке пробуем запасную
       const bases =
@@ -101,11 +102,12 @@ async function doRefresh(): Promise<string | null> {
         try {
           const r = await axios.post(
             `${base}/auth/refresh`,
-            { refresh_token: refreshToken },
+            { refresh_token: sessionRefresh },
             { timeout: 15000 },
           );
           const access = r.data?.access_token ?? r.data?.accessToken ?? null;
           const refresh = r.data?.refresh_token ?? r.data?.refreshToken ?? null;
+          if (refreshToken !== sessionRefresh) return null;
           setTokens(access, refresh ?? refreshToken);
           useAuthStore.getState().setAccessToken(access);
           return access;
@@ -125,6 +127,7 @@ async function doRefresh(): Promise<string | null> {
       return null;
     })()
       .catch((error: unknown) => {
+        if (refreshToken !== sessionRefresh) return null;
         // Keep the refresh credential during an outage so the cached read-only
         // session can resume once connectivity returns. HTTP rejections still log out.
         if (isNetworkFailure(error)) {

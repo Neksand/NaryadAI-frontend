@@ -77,6 +77,16 @@ export const ApiErrorSchema = z.object({
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
 
+const ReviewTextListSchema = z.preprocess((value) => {
+  // asyncpg installations without a JSONB codec can return serialized arrays.
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value ? [value] : [];
+  }
+}, z.array(z.string()).nullable().optional());
+
 export const AIReviewSchema = z
   .object({
     verdict: z
@@ -86,8 +96,8 @@ export const AIReviewSchema = z
     score: z.number().nullable().optional(),
     confidence: z.number().nullable().optional(),
     explanation: z.string().nullable().optional(),
-    strengths: z.array(z.string()).nullable().optional(),
-    improvements: z.array(z.string()).nullable().optional(),
+    strengths: ReviewTextListSchema,
+    improvements: ReviewTextListSchema,
     checks: z.unknown().nullable().optional(),
   })
   .passthrough();

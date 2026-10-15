@@ -27,7 +27,8 @@ describe('ForecastPanel', () => {
 
     await waitFor(() => expect(screen.getByText('Конвейер К-3')).toBeTruthy());
     expect(apiGetMock).toHaveBeenCalledWith('/analytics/failure-forecast');
-    expect(screen.getByLabelText('Вероятность: 87%')).toHaveTextContent('87%');
+    expect(screen.getByLabelText('Индекс риска: 87 / 100')).toHaveTextContent('87 / 100');
+    expect(screen.getByText(/Это приоритет проверки, а не вероятность отказа/)).toBeVisible();
     expect(screen.getByText('Дробилка')).toBeTruthy();
     // recent + growth line for the top row
     expect(screen.getByText(/Внеплановых за 30 дней: 8/)).toBeTruthy();

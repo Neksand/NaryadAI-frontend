@@ -63,8 +63,8 @@ const order: WorkOrder = {
   allowed_actions: ['accept', 'reject', 'pause', 'complete'],
 };
 
-function renderOrder(actions: string[] = order.allowed_actions) {
-  woMocks.getWorkOrder.mockResolvedValue({ ...order, allowed_actions: actions });
+function renderOrder(actions: string[] = order.allowed_actions, extra: Partial<WorkOrder> = {}) {
+  woMocks.getWorkOrder.mockResolvedValue({ ...order, allowed_actions: actions, ...extra });
   render(
     <MemoryRouter initialEntries={['/worker/orders/o1']}>
       <QueryClientProvider client={testQueryClient()}>
@@ -111,6 +111,13 @@ describe('WorkerOrder actions', () => {
     await waitFor(() =>
       expect(screen.getByText('Нет доступных действий — обновите экран.')).toBeTruthy(),
     );
+    expect(document.querySelector('.dock-sticky')).toBeNull();
+  });
+
+  it('does not instruct a worker to refresh an already closed order', async () => {
+    renderOrder([], { status: 'closed' });
+    await screen.findByText('Закрыт');
+    expect(screen.queryByText('Нет доступных действий — обновите экран.')).toBeNull();
     expect(document.querySelector('.dock-sticky')).toBeNull();
   });
 });
@@ -178,4 +185,116 @@ describe('WorkerOrder complete sheet', () => {
       ),
     );
   });
+});
+
+describe('WorkerOrder material accounting', () => {
+  it('submits catalog material quantities, comment and restoration choice', async () => {
+    const u = userEvent.setup();
+    dictMock.mockImplementation(async (name) =>
+      name === 'materials'
+        ? [{ id: 'm1', name: 'Масло', unit: 'л' }]
+        : [{ id: 'f1', code: 'F1', name: 'Трещина' }],
+    );
+    renderOrder(['complete']);
+    await u.click(await screen.findByRole('button', { name: 'Завершить' }));
+    await u.type(screen.getByLabelText(/Что сделано/), 'Заменил уплотнение и долил масло');
+    await u.selectOptions(screen.getByLabelText(/Шифр неисправности/), 'f1');
+    await u.click(screen.getByRole('button', { name: 'Добавить материал' }));
+    const submit = screen.getByRole('button', { name: 'Завершить' });
+    expect(submit).toBeDisabled();
+    await u.selectOptions(screen.getByLabelText('Материал 1'), 'm1');
+    await u.clear(screen.getByLabelText('Количество 1'));
+    await u.type(screen.getByLabelText('Количество 1'), '0');
+    expect(submit).toBeDisabled();
+    await u.clear(screen.getByLabelText('Количество 1'));
+    await u.type(screen.getByLabelText('Количество 1'), '2.5');
+    await u.type(
+      screen.getByLabelText('Комментарий (необязательно)'),
+      '  Нужна проверка мастера  ',
+    );
+    await u.click(screen.getByLabelText('Оборудование восстановлено'));
+    expect(submit).toBeEnabled();
+    await u.click(submit);
+    await waitFor(() =>
+      expect(woMocks.transitionOrder).toHaveBeenCalledWith(
+        'o1',
+        'complete',
+        expect.objectContaining({
+          comment: 'Нужна проверка мастера',
+          form: expect.objectContaining({
+            materials: [{ material_id: 'm1', quantity: 2.5 }],
+            equipment_restored: false,
+          }),
+        }),
+        expect.any(String),
+      ),
+    );
+  });
+
+  it('shows an API completion rejection inside the still-open dialog', async () => {
+    const u = userEvent.setup();
+    dictMock.mockResolvedValue([{ id: 'f1', code: 'F1', name: 'Трещина' }]);
+    woMocks.transitionOrder.mockRejectedValueOnce(new Error('server unavailable'));
+    renderOrder(['complete']);
+    await u.click(await screen.findByRole('button', { name: 'Завершить' }));
+    await u.type(screen.getByLabelText(/Что сделано/), 'Проверил оборудование');
+    await u.selectOptions(screen.getByLabelText(/Шифр неисправности/), 'f1');
+    await u.click(screen.getByRole('button', { name: 'Завершить' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.closest('[role="dialog"]')).toBe(screen.getByRole('dialog'));
+    expect(screen.getByLabelText(/Что сделано/)).toHaveValue('Проверил оборудование');
+  });
+});
+
+it('removes an invalid material row before completion and preserves the draft on cancel', async () => {
+  const u = userEvent.setup();
+  dictMock.mockImplementation(async (name) =>
+    name === 'materials'
+      ? [
+          { id: 'm1', name: 'Масло', unit: 'л' },
+          { id: 'm2', name: 'Болт', unit: 'шт' },
+        ]
+      : [{ id: 'f1', code: 'F1', name: 'Трещина' }],
+  );
+  renderOrder(['complete']);
+  await u.click(await screen.findByRole('button', { name: 'Завершить' }));
+  await u.type(screen.getByLabelText(/Что сделано/), 'Заменил масло');
+  await u.selectOptions(screen.getByLabelText(/Шифр неисправности/), 'f1');
+  await u.click(screen.getByRole('button', { name: 'Добавить материал' }));
+  await u.selectOptions(screen.getByLabelText('Материал 1'), 'm1');
+  await u.click(screen.getByRole('button', { name: 'Добавить материал' }));
+  expect(screen.getByRole('button', { name: 'Завершить' })).toBeDisabled();
+  await u.click(screen.getByRole('button', { name: 'Удалить материал 2' }));
+  await u.clear(screen.getByLabelText('Количество 1'));
+  await u.type(screen.getByLabelText('Количество 1'), '1000001');
+  expect(screen.getByRole('button', { name: 'Завершить' })).toBeDisabled();
+  await u.click(screen.getByRole('button', { name: 'Отмена' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(woMocks.transitionOrder).not.toHaveBeenCalled();
+  await u.click(screen.getByRole('button', { name: 'Завершить' }));
+  expect(screen.getByLabelText(/Что сделано/)).toHaveValue('Заменил масло');
+  expect(screen.getByLabelText('Количество 1')).toHaveValue(1000001);
+  await u.click(screen.getByRole('button', { name: 'Удалить материал 1' }));
+  expect(screen.getByRole('button', { name: 'Завершить' })).toBeEnabled();
+});
+
+it('keeps material directory errors visible with a retry button', async () => {
+  const u = userEvent.setup();
+  let materialCalls = 0;
+  dictMock.mockImplementation(async (name) => {
+    if (name === 'materials') {
+      materialCalls += 1;
+      if (materialCalls === 1) throw new Error('catalog unavailable');
+      return [{ id: 'm1', name: 'Масло', unit: 'л' }];
+    }
+    return [{ id: 'f1', code: 'F1', name: 'Трещина' }];
+  });
+  renderOrder(['complete']);
+  await u.click(await screen.findByRole('button', { name: 'Завершить' }));
+  await screen.findByRole('alert');
+  expect(screen.getByRole('button', { name: 'Добавить материал' })).toBeDisabled();
+  await u.click(screen.getByRole('button', { name: 'Повторить' }));
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Добавить материал' })).toBeEnabled(),
+  );
 });

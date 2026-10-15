@@ -93,6 +93,7 @@ describe('useRealtime', () => {
     });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['orders'] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['board'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['workers'] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['notifications'] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['order', 'o9'] });
     expect(newOrder.mock.calls[0][0].detail).toEqual({ id: 'o9', number: 21 });
@@ -125,7 +126,8 @@ describe('useRealtime', () => {
     expect(spy).toHaveBeenCalledWith();
   });
 
-  it('reconnects with backoff and shows banner briefly', () => {
+  it('reconnects with backoff, refetches missed events and shows banner briefly', () => {
+    const spy = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
     const { hook } = connect();
     expect(hook.result.current.status).toBe('open');
     act(() => {
@@ -141,6 +143,7 @@ describe('useRealtime', () => {
       FakeWS.instances[1].onopen?.();
     });
     expect(hook.result.current.reconnected).toBe(true);
+    expect(spy).toHaveBeenCalledWith();
     act(() => {
       vi.advanceTimersByTime(6000);
     });
@@ -153,4 +156,34 @@ describe('useRealtime', () => {
     hook.unmount();
     expect(ws.close).toHaveBeenCalled();
   });
+});
+
+it('handles the actual backend worker-status envelope without treating employee id as order id', () => {
+  const spy = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+  const { ws } = connect();
+  spy.mockClear();
+  act(() => {
+    ws.onmessage?.({
+      data: JSON.stringify({
+        type: 'WORKER_STATUS_CHANGED',
+        payload: { id: 'employee-1', status: 'busy' },
+      }),
+    });
+  });
+  expect(spy).toHaveBeenCalledWith({ queryKey: ['workers'] });
+  expect(spy).toHaveBeenCalledWith({ queryKey: ['board'] });
+  expect(spy).not.toHaveBeenCalledWith({ queryKey: ['order', 'employee-1'] });
+});
+
+it('does not reload the employee directory for every deadline notification', () => {
+  const spy = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+  const { ws } = connect();
+  spy.mockClear();
+  act(() => {
+    ws.onmessage?.({
+      data: JSON.stringify({ type: 'NOTIFICATION_CREATED', payload: { related_entity_id: 'o1' } }),
+    });
+  });
+  expect(spy).toHaveBeenCalledWith({ queryKey: ['notifications'] });
+  expect(spy).not.toHaveBeenCalledWith({ queryKey: ['workers'] });
 });

@@ -92,16 +92,21 @@ export function Shell({
 
   return (
     <div className="min-h-dvh flex flex-col mx-auto w-full max-w-3xl md:max-w-6xl">
-      <header className="flex items-center gap-2 px-4 pt-4 pb-3 min-h-[64px]">
+      <header className="app-header flex flex-wrap sm:flex-nowrap items-center gap-2 px-4 pt-4 pb-3 min-h-[64px]">
         {!isHome && (
-          <button className="btn btn-sm" onClick={goBack} aria-label={t('common.back')}>
-            <Icon name="back" size={18} /> {t('common.back')}
+          <button
+            className="btn btn-sm min-h-11 min-w-11"
+            onClick={goBack}
+            aria-label={t('common.back')}
+          >
+            <Icon name="back" size={18} />{' '}
+            <span className="hidden sm:inline">{t('common.back')}</span>
           </button>
         )}
-        <span className="avatar" aria-hidden="true">
+        <span className="avatar mr-auto sm:mr-0" aria-hidden="true">
           {initial}
         </span>
-        <div className="flex-1 min-w-0">
+        <div className="order-last basis-full sm:order-none sm:basis-auto sm:flex-1 min-w-0">
           <b className="block text-[22px] leading-7 truncate">{title}</b>
           <span className="flex items-center gap-2 mt-0.5 text-[13px] text-[var(--ink-muted)]">
             {user?.role === 'worker' ? (
@@ -135,8 +140,13 @@ export function Shell({
           <option value="ru">RU</option>
           <option value="kk">KZ</option>
         </select>
-        <button className="btn btn-sm" onClick={onLogout} aria-label={t('common.logout')}>
-          <Icon name="logout" size={18} /> {t('common.logout')}
+        <button
+          className="btn btn-sm min-h-11 min-w-11"
+          onClick={onLogout}
+          aria-label={t('common.logout')}
+        >
+          <Icon name="logout" size={18} />{' '}
+          <span className="hidden sm:inline">{t('common.logout')}</span>
         </button>
       </header>
 

@@ -112,6 +112,12 @@ export default {
     changePriority: 'Сменить приоритет',
   },
   worker: {
+    assessment: 'Оценка выполнения',
+    aiRecommendation: 'Рекомендация ИИ',
+    aiScore: 'Оценка ИИ',
+    photoEvidence: 'Фото до и после',
+    photoReviewNote: 'Фото служат подтверждением работ. Итоговое решение принимает мастер.',
+
     active: 'Сейчас в работе',
     queue: 'Очередь',
     urgent: 'Срочные',
@@ -124,6 +130,11 @@ export default {
     workDone: 'Что сделано',
     faultCode: 'Шифр неисправности',
     materials: 'Материалы',
+    material: 'Материал',
+    quantity: 'Количество',
+    addMaterial: 'Добавить материал',
+    removeMaterial: 'Удалить материал',
+    invalidMaterial: 'Выберите материал и количество больше нуля (до 1 000 000).',
     restored: 'Оборудование восстановлено',
     afterPhotos: 'Фото «после»',
     needAfterPhoto:
@@ -152,6 +163,12 @@ export default {
     },
   },
   master: {
+    manualScore: 'Оценка мастера (0–100)',
+    manualReviewNote:
+      'При низкой уверенности ИИ проверьте результат и укажите свою оценку с комментарием либо верните наряд на доработку.',
+    overrideClose: 'Принять со своей оценкой',
+
+    equipmentStopped: 'Зафиксировать простой оборудования',
     shift: 'Смена',
     issued: 'Выдано',
     doneToday: 'Выполнено',
@@ -169,6 +186,7 @@ export default {
     beforePhoto: 'Фото «до»',
     review: 'Приёмка ИИ',
     reviewPending: 'ИИ-проверка ещё идёт, подождите…',
+    agreeRework: 'Согласен — на доработку',
     agreeClose: 'Согласен — закрыть',
     sendRework: 'Вернуть на доработку',
     reworkNeedsComment: 'Для доработки нужен комментарий',
@@ -217,8 +235,10 @@ export default {
     ratingRejected: 'Отклонения',
     ratingSample: 'Нужно закрыть не менее 5 нарядов для устойчивой оценки.',
     noRating: 'Пока нет данных для расчёта рейтинга.',
-    forecast: 'Прогноз отказов',
-    forecastProbability: 'Вероятность',
+    forecast: 'Риск отказов',
+    forecastProbability: 'Индекс риска',
+    forecastNote:
+      'Эвристическая шкала 0–100 по истории ремонтов. Это приоритет проверки, а не вероятность отказа.',
     forecastRecent: 'Внеплановых за 30 дней',
     forecastGrowth: 'Рост',
   },
@@ -313,6 +333,7 @@ export default {
     recommendation: 'Рекомендация ИИ',
     confidence: 'Уверенность',
     apply: 'Применить',
+    verdict_accepted_with_remarks: 'Принято с замечаниями',
     verdict_accepted: 'Принято',
     verdict_needs_rework: 'Требуется доработка',
     verdict_review: 'Нужно решение мастера',

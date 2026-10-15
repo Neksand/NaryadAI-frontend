@@ -8,6 +8,7 @@ import { Shell, roleTabs } from '../components/Shell';
 import { displayOrder, useNames } from '../hooks/useNames';
 import { AITag, ErrorState, PriorityTag, SkeletonList, StatusChip } from '../components/ui';
 import { toLocalizedError, newUUID } from '../lib/api-client';
+import { OrderPhotos } from '../components/OrderEvidence';
 import { Icon } from '../components/Icon';
 
 export default function MasterReview() {
@@ -16,6 +17,7 @@ export default function MasterReview() {
   const qc = useQueryClient();
   const names = useNames();
   const [comment, setComment] = useState('');
+  const [manualScore, setManualScore] = useState('');
 
   const order = useQuery({ queryKey: ['order', id], queryFn: () => getWorkOrder(id) });
   const review = useQuery({
@@ -56,6 +58,14 @@ export default function MasterReview() {
 
   const verdict = (review.data?.verdict ?? '') as string;
   const needsRework = verdict === 'needs_rework';
+  const actions = o.allowed_actions ?? [];
+  const reviewReady = !!verdict && !review.isPending && !review.isError;
+  const decisionPending = decide.isPending || rework.isPending;
+  const validManualScore =
+    manualScore.trim() !== '' &&
+    Number.isInteger(Number(manualScore)) &&
+    Number(manualScore) >= 0 &&
+    Number(manualScore) <= 100;
 
   return (
     <Shell title={`${t('master.review')} №${String(o.number ?? '')}`} tabs={roleTabs(t, 'master')}>
@@ -70,6 +80,7 @@ export default function MasterReview() {
         </div>
       </div>
 
+      <OrderPhotos photos={o.photos} />
       {review.isPending ? (
         <SkeletonList rows={2} />
       ) : review.isError ? (
@@ -112,17 +123,49 @@ export default function MasterReview() {
             placeholder={t('master.reworkNeedsComment')}
           />
         </label>
+        <label className="flex flex-col gap-1">
+          <span className="label">{t('master.manualScore')}</span>
+          <input
+            className="input"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            inputMode="numeric"
+            value={manualScore}
+            onChange={(event) => setManualScore(event.target.value)}
+          />
+        </label>
+        <p className="text-sm text-[var(--ink-muted)]">{t('master.manualReviewNote')}</p>
         <div className="dock !p-0 !bg-transparent !border-0">
           <button
             className="btn btn-ok btn-xl btn-block"
-            disabled={decide.isPending}
+            disabled={
+              decisionPending ||
+              !reviewReady ||
+              typeof review.data?.score !== 'number' ||
+              !actions.includes('close')
+            }
             onClick={() => decide.mutate({ decision: 'agree_ai' })}
           >
-            {t('master.agreeClose')}
+            {t(needsRework ? 'master.agreeRework' : 'master.agreeClose')}
+          </button>
+          <button
+            className="btn btn-primary btn-block"
+            disabled={
+              decisionPending ||
+              !reviewReady ||
+              !actions.includes('close') ||
+              !validManualScore ||
+              !comment.trim()
+            }
+            onClick={() => decide.mutate({ decision: 'override', score: Number(manualScore) })}
+          >
+            {t('master.overrideClose')}
           </button>
           <button
             className="btn btn-danger btn-block"
-            disabled={!comment.trim() || rework.isPending}
+            disabled={!comment.trim() || decisionPending || !actions.includes('return_to_rework')}
             onClick={() => rework.mutate()}
           >
             {t('master.sendRework')}
