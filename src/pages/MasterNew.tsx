@@ -17,6 +17,21 @@ import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import { saveOfflinePhoto, removeOfflinePhotos, type PendingPhotoRef } from '../lib/offline-photos';
 import { useAuthStore } from '../store/auth-store';
 
+const BEFORE_LIMIT = 5;
+
+function isHeicFile(f: File): boolean {
+  const name = (f.name || '').toLowerCase();
+  const type = (f.type || '').toLowerCase();
+  return (
+    name.endsWith('.heic') ||
+    name.endsWith('.heif') ||
+    type === 'image/heic' ||
+    type === 'image/heif' ||
+    type === 'image/heic-sequence' ||
+    type === 'image/heif-sequence'
+  );
+}
+
 export default function MasterNew() {
   const { t, i18n } = useTranslation();
   const lang = (i18n.language || 'ru').slice(0, 2);
@@ -37,6 +52,8 @@ export default function MasterNew() {
   const [photoIds, setPhotoIds] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Последний неуспешный файл для кнопки «Повторить» (повтор без перевыбора).
+  const [pendingFailedFile, setPendingFailedFile] = useState<File | null>(null);
   // Offline draft photos: blobs in per-employee IndexedDB, uploaded before create.
   const [pendingLocalPhotos, setPendingLocalPhotos] = useState<PendingPhotoRef[]>([]);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
@@ -139,6 +156,8 @@ export default function MasterNew() {
   });
 
   const totalPhotos = photoIds.length + pendingLocalPhotos.length;
+  const isPhotoLimitReached = totalPhotos >= BEFORE_LIMIT;
+  const photoLimitHint = t('master.photoLimit', 'Достигнут лимит: максимум 5 фото');
 
   const makePreviewUrl = (f: File | Blob): string | undefined => {
     try {
@@ -152,7 +171,13 @@ export default function MasterNew() {
   };
 
   const handlePhotoFile = async (f: File) => {
-    if (uploadingPhoto || totalPhotos >= 5) return;
+    if (uploadingPhoto || totalPhotos >= BEFORE_LIMIT) return;
+    if (isHeicFile(f)) {
+      setPhotoError(
+        t('master.heicHint', 'HEIC не поддерживается: снимите камерой или выберите JPEG/PNG'),
+      );
+      return;
+    }
     const offlineNow =
       !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
     if (offlineNow) {
@@ -163,10 +188,12 @@ export default function MasterNew() {
         const url = makePreviewUrl(f);
         if (url) setPreviewUrls((p) => ({ ...p, [rec.localId]: url }));
         setPendingLocalPhotos((p) =>
-          p.length >= 5 ? p : [...p, { localId: rec.localId, kind: rec.kind }],
+          p.length >= BEFORE_LIMIT ? p : [...p, { localId: rec.localId, kind: rec.kind }],
         );
+        setPendingFailedFile(null);
       } catch (err) {
         setPhotoError(toLocalizedError(err).message);
+        setPendingFailedFile(f);
       } finally {
         setUploadingPhoto(false);
       }
@@ -179,11 +206,18 @@ export default function MasterNew() {
       const r = await uploadPhoto(f, 'before');
       if (preview) setPreviewUrls((p) => ({ ...p, [r.id]: preview }));
       setPhotoIds((p) => [...p, r.id]);
+      setPendingFailedFile(null);
     } catch (err) {
       setPhotoError(toLocalizedError(err).message);
+      setPendingFailedFile(f);
     } finally {
       setUploadingPhoto(false);
     }
+  };
+
+  const handleRetryPhoto = () => {
+    if (uploadingPhoto || !pendingFailedFile) return;
+    void handlePhotoFile(pendingFailedFile);
   };
 
   const handleDeleteUploaded = async (photoId: string) => {
@@ -500,6 +534,9 @@ export default function MasterNew() {
         </label>
         <div className="flex flex-col gap-1">
           <span className="label">{t('master.beforePhoto')}</span>
+          <span role="status" aria-live="polite">
+            {t('master.photoCount', `Фото ${totalPhotos} из ${BEFORE_LIMIT}`)}
+          </span>
           <div className="flex gap-2">
             <label className="file-btn">
               <Icon name="camera" size={22} /> Галерея
@@ -508,7 +545,8 @@ export default function MasterNew() {
                 className="hidden"
                 accept="image/*"
                 aria-label="Галерея"
-                disabled={uploadingPhoto || totalPhotos >= 5}
+                disabled={uploadingPhoto || isPhotoLimitReached}
+                title={isPhotoLimitReached ? photoLimitHint : undefined}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   e.target.value = '';
@@ -525,7 +563,8 @@ export default function MasterNew() {
                 accept="image/*"
                 capture="environment"
                 aria-label="Снять фото"
-                disabled={uploadingPhoto || totalPhotos >= 5}
+                disabled={uploadingPhoto || isPhotoLimitReached}
+                title={isPhotoLimitReached ? photoLimitHint : undefined}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   e.target.value = '';
@@ -535,6 +574,11 @@ export default function MasterNew() {
               />
             </label>
           </div>
+          {isPhotoLimitReached && (
+            <span role="note" className="text-sm opacity-70">
+              {photoLimitHint}
+            </span>
+          )}
           {uploadingPhoto && <span role="status">{t('common.loading')}</span>}
           {totalPhotos > 0 && (
             <span className="chip ok">
@@ -607,6 +651,11 @@ export default function MasterNew() {
           {photoError && (
             <div className="banner banner-danger" role="alert">
               {photoError}
+              {pendingFailedFile && !uploadingPhoto && (
+                <button type="button" className="btn btn-sm mt-2" onClick={handleRetryPhoto}>
+                  {t('common.retry')}
+                </button>
+              )}
             </div>
           )}
         </div>

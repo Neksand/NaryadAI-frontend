@@ -51,6 +51,26 @@ function actionTone(a: string): string {
   return 'btn-primary';
 }
 
+const BEFORE_LIMIT = 5;
+const AFTER_LIMIT = 10;
+
+function photoLimitFor(kind: PhotoKind): number {
+  return kind === 'before' ? BEFORE_LIMIT : AFTER_LIMIT;
+}
+
+function isHeicFile(f: File): boolean {
+  const name = (f.name || '').toLowerCase();
+  const type = (f.type || '').toLowerCase();
+  return (
+    name.endsWith('.heic') ||
+    name.endsWith('.heif') ||
+    type === 'image/heic' ||
+    type === 'image/heif' ||
+    type === 'image/heic-sequence' ||
+    type === 'image/heif-sequence'
+  );
+}
+
 /** Buttons come ONLY from backend allowed_actions. Backend owns the state machine. */
 export default function WorkerOrder() {
   const { id = '' } = useParams();
@@ -83,6 +103,8 @@ export default function WorkerOrder() {
   const [afterPct, setAfterPct] = useState<number | null>(null);
   const [afterDone, setAfterDone] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  // Последний неуспешный файл для кнопки «Повторить» (повтор без перевыбора).
+  const [failedPhoto, setFailedPhoto] = useState<{ file: File; kind: PhotoKind } | null>(null);
   // Offline-first after-photos: blobs live in per-employee IndexedDB until replay.
   const [pendingOfflinePhotos, setPendingOfflinePhotos] = useState<PendingPhotoRef[]>([]);
   const [offlinePreviewUrls, setOfflinePreviewUrls] = useState<Record<string, string>>({});
@@ -185,7 +207,27 @@ export default function WorkerOrder() {
     setReasonComment('');
   };
 
+  const serverPhotos = (orderPhotos.data ?? []) as { id: string; kind?: string }[];
+  const pendingAfterPhotos = pendingOfflinePhotos.filter((p) => p.kind === 'after');
+  const pendingBeforePhotos = pendingOfflinePhotos.filter((p) => p.kind === 'before');
+  const serverAfterCount = serverPhotos.filter((p) => !p.kind || p.kind === 'after').length;
+  const serverBeforeCount = serverPhotos.filter((p) => p.kind === 'before').length;
+  const photoCountFor = (kind: PhotoKind): number =>
+    kind === 'before'
+      ? serverBeforeCount + pendingBeforePhotos.length
+      : serverAfterCount + pendingAfterPhotos.length;
+  const afterTotal = photoCountFor('after');
+  const isAfterLimitReached = afterTotal >= AFTER_LIMIT;
+  const uploadingAfter = afterPct !== null && afterPct < 100;
+
   const onPhoto = async (file: File, kind: PhotoKind) => {
+    if (isHeicFile(file)) {
+      setPhotoError(
+        t('worker.heicHint', 'HEIC не поддерживается: снимите камерой или выберите JPEG/PNG'),
+      );
+      return;
+    }
+    if (photoCountFor(kind) >= photoLimitFor(kind)) return;
     const isOffline =
       !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
     if (isOffline) {
@@ -203,12 +245,17 @@ export default function WorkerOrder() {
           /* preview optional */
         }
         if (url) setOfflinePreviewUrls((p) => ({ ...p, [rec.localId]: url }));
+        const limit = photoLimitFor(kind);
         setPendingOfflinePhotos((p) =>
-          p.length >= 5 ? p : [...p, { localId: rec.localId, kind: rec.kind }],
+          p.filter((item) => item.kind === kind).length >= limit
+            ? p
+            : [...p, { localId: rec.localId, kind: rec.kind }],
         );
         if (kind === 'after') setAfterDone(true);
+        setFailedPhoto(null);
       } catch (e) {
         setPhotoError(toLocalizedError(e).message);
+        setFailedPhoto({ file, kind });
       }
       return;
     }
@@ -218,12 +265,19 @@ export default function WorkerOrder() {
       await uploadPhoto(file, kind, id, setAfterPct);
       setAfterPct(100);
       if (kind === 'after') setAfterDone(true);
+      setFailedPhoto(null);
       invalidate();
       void orderPhotos.refetch();
     } catch (e) {
       setAfterPct(null);
       setPhotoError(toLocalizedError(e).message);
+      setFailedPhoto({ file, kind });
     }
+  };
+
+  const handleRetryPhoto = () => {
+    if (!failedPhoto || uploadingAfter) return;
+    void onPhoto(failedPhoto.file, failedPhoto.kind);
   };
 
   const handleDeleteServerPhoto = async (photoId: string) => {
@@ -585,6 +639,9 @@ export default function WorkerOrder() {
             </label>
             <div className="flex flex-col gap-1">
               <span className="label">{t('worker.afterPhotos')}</span>
+              <span role="status" aria-live="polite">
+                {t('worker.photoCount', `Фото ${afterTotal} из ${AFTER_LIMIT}`)}
+              </span>
               <div className="flex gap-2">
                 <label className="file-btn">
                   <Icon name="camera" size={22} /> Галерея
@@ -593,7 +650,12 @@ export default function WorkerOrder() {
                     className="hidden"
                     accept="image/*"
                     aria-label="Галерея"
-                    disabled={afterPct !== null && afterPct < 100}
+                    disabled={uploadingAfter || isAfterLimitReached}
+                    title={
+                      isAfterLimitReached
+                        ? t('worker.photoLimit', 'Достигнут лимит: максимум 10 фото')
+                        : undefined
+                    }
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       e.target.value = '';
@@ -609,7 +671,12 @@ export default function WorkerOrder() {
                     accept="image/*"
                     capture="environment"
                     aria-label="Снять фото"
-                    disabled={afterPct !== null && afterPct < 100}
+                    disabled={uploadingAfter || isAfterLimitReached}
+                    title={
+                      isAfterLimitReached
+                        ? t('worker.photoLimit', 'Достигнут лимит: максимум 10 фото')
+                        : undefined
+                    }
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       e.target.value = '';
@@ -618,6 +685,11 @@ export default function WorkerOrder() {
                   />
                 </label>
               </div>
+              {isAfterLimitReached && (
+                <span role="note" className="text-sm opacity-70">
+                  {t('worker.photoLimit', 'Достигнут лимит: максимум 10 фото')}
+                </span>
+              )}
               {afterPct !== null && (
                 <div
                   className="mono text-sm text-[var(--ink-muted)]"
@@ -688,6 +760,11 @@ export default function WorkerOrder() {
               {photoError && (
                 <div className="banner banner-danger" role="alert">
                   {photoError}
+                  {failedPhoto && !uploadingAfter && (
+                    <button type="button" className="btn btn-sm mt-2" onClick={handleRetryPhoto}>
+                      {t('common.retry')}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
