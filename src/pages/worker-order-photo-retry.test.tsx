@@ -20,6 +20,7 @@ const photoMocks = vi.hoisted(() => ({
   uploadPhoto: vi.fn(async () => ({ id: 'p1' })),
   listOrderPhotos: vi.fn(async () => []),
   deletePhoto: vi.fn(async () => {}),
+  describePhotoFailure: (_f: unknown, _t: unknown, _e: unknown) => 'diag',
 }));
 const offlinePhotoMocks = vi.hoisted(() => ({
   saveOfflinePhoto: vi.fn(async () => ({ localId: 'loc-after-1', kind: 'after' })),

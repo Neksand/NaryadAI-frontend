@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { api, idempotencyHeaders } from '../lib/api-client';
 import { normalizeOrderText, trimEdges } from '../lib/inputText';
 import { readWithSnapshot } from '../lib/snapshot-cache';
@@ -145,7 +146,23 @@ export async function createWorkOrder(
   // Нормализация до Idempotency-Key: пробелы по краям не должны плодить дубли.
   const clean = normalizeOrderText({ ...input, description: trimEdges(input.description ?? '') });
   // Бэкенд возвращает только {id, number, status} — полный наряд догружается отдельным GET.
-  const { data } = await api.post('/work-orders', clean, { headers: idempotencyHeaders(key) });
+  // Медленный канал: 90с + один повтор с тем же ключом (идемпотентно, дубликатов нет).
+  const send = () =>
+    api.post<{ id: string; number?: number; status?: string; replayed?: boolean }>(
+      '/work-orders',
+      clean,
+      {
+        headers: idempotencyHeaders(key),
+        timeout: 90000,
+      },
+    );
+  let data: { id: string; number?: number; status?: string; replayed?: boolean } | undefined;
+  try {
+    data = (await send())?.data;
+  } catch (err) {
+    if (axios.isAxiosError(err) && !err.response) data = (await send())?.data;
+    else throw err;
+  }
   if (!data?.id) throw new Error('Некорректный ответ сервера');
   return data;
 }

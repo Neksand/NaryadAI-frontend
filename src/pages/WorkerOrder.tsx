@@ -4,7 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getWorkOrder, getOrderEvents, transitionOrder } from '../api/workOrders';
 import { dictList } from '../api/misc';
-import { uploadPhoto, deletePhoto, listOrderPhotos, type PhotoKind } from '../api/photos';
+import {
+  uploadPhoto,
+  deletePhoto,
+  describePhotoFailure,
+  listOrderPhotos,
+  type PhotoKind,
+} from '../api/photos';
 import { suggestFaultCode } from '../api/ai';
 import { Shell, roleTabs } from '../components/Shell';
 import { VoiceButton } from '../components/VoiceButton';
@@ -228,6 +234,7 @@ export default function WorkerOrder() {
       return;
     }
     if (photoCountFor(kind) >= photoLimitFor(kind)) return;
+    const startedAt = Date.now();
     const isOffline =
       !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
     if (isOffline) {
@@ -254,7 +261,9 @@ export default function WorkerOrder() {
         if (kind === 'after') setAfterDone(true);
         setFailedPhoto(null);
       } catch (e) {
-        setPhotoError(toLocalizedError(e).message);
+        setPhotoError(
+          `${toLocalizedError(e).message} (${describePhotoFailure(file, startedAt, e)})`,
+        );
         setFailedPhoto({ file, kind });
       }
       return;
@@ -270,7 +279,7 @@ export default function WorkerOrder() {
       void orderPhotos.refetch();
     } catch (e) {
       setAfterPct(null);
-      setPhotoError(toLocalizedError(e).message);
+      setPhotoError(`${toLocalizedError(e).message} (${describePhotoFailure(file, startedAt, e)})`);
       setFailedPhoto({ file, kind });
     }
   };

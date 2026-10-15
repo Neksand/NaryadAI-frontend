@@ -224,13 +224,22 @@ export function toLocalizedError(err: unknown): LocalizedApiError {
       if (first?.msg)
         return { code: 'validation_error', message: first.msg, status: err.response?.status };
     }
-    if (!err.response)
-      return { code: 'network_error', message: i18n.t('error.network'), status: 0 };
+    if (!err.response) {
+      const tech = axios.isAxiosError(err) && err.code ? ` [${err.code}]` : '';
+      return {
+        code: 'network_error',
+        message: `${i18n.t('error.network')}${tech}`,
+        status: 0,
+      };
+    }
     return {
       code: `http_${err.response.status}`,
       message: `${i18n.t('error.http')} ${err.response.status}`,
       status: err.response.status,
     };
+  }
+  if (err instanceof Error && err.message) {
+    return { code: 'unknown', message: `${i18n.t('error.unknown')}: ${err.message}` };
   }
   return { code: 'unknown', message: i18n.t('error.unknown') };
 }

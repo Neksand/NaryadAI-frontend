@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { createWorkOrder, getSimilarRepairs } from '../api/workOrders';
 import { suggestAssignee } from '../api/ai';
 import { catalogList } from '../api/misc';
-import { uploadPhoto, deletePhoto } from '../api/photos';
+import { uploadPhoto, deletePhoto, describePhotoFailure } from '../api/photos';
 import { Shell, roleTabs } from '../components/Shell';
 import { VoiceButton } from '../components/VoiceButton';
 import { DateTimeField } from '../components/DateTimeField';
@@ -173,6 +173,7 @@ export default function MasterNew() {
 
   const handlePhotoFile = async (f: File) => {
     if (uploadingPhoto || totalPhotos >= BEFORE_LIMIT) return;
+    const startedAt = Date.now();
     if (isHeicFile(f)) {
       setPhotoError(
         t('master.heicHint', 'HEIC не поддерживается: снимите камерой или выберите JPEG/PNG'),
@@ -193,7 +194,9 @@ export default function MasterNew() {
         );
         setPendingFailedFile(null);
       } catch (err) {
-        setPhotoError(toLocalizedError(err).message);
+        setPhotoError(
+          `${toLocalizedError(err).message} (${describePhotoFailure(f, startedAt, err)})`,
+        );
         setPendingFailedFile(f);
       } finally {
         setUploadingPhoto(false);
@@ -210,7 +213,9 @@ export default function MasterNew() {
       setPhotoIds((p) => [...p, r.id]);
       setPendingFailedFile(null);
     } catch (err) {
-      setPhotoError(toLocalizedError(err).message);
+      setPhotoError(
+        `${toLocalizedError(err).message} (${describePhotoFailure(f, startedAt, err)})`,
+      );
       setPendingFailedFile(f);
     } finally {
       setUploadingPhoto(false);

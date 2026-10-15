@@ -153,6 +153,20 @@ export async function uploadPhoto(
   return data;
 }
 
+/** Диагностика неуспешной загрузки: размер, длительность, код — для поля боя с каналом. */
+export function describePhotoFailure(file: Blob, startedAt: number, err: unknown): string {
+  const kb = Math.max(1, Math.round(file.size / 1024));
+  const secs = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+  const code =
+    err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : '';
+  const status =
+    err && typeof err === 'object' && 'response' in err
+      ? String((err as { response?: { status?: unknown } }).response?.status ?? '')
+      : '';
+  const tech = [code, status && `HTTP ${status}`].filter(Boolean).join(' ');
+  return `${kb} КБ / ${secs} с${tech ? ` [${tech}]` : ''}`;
+}
+
 export async function photoUrl(photoId: string): Promise<string> {
   const { data } = await api.get(`/photos/${photoId}/url`);
   return data.url;
