@@ -13,10 +13,11 @@ import { SHOW_DEMO_LOGIN } from '../lib/env';
 export function friendlyLoginError(raw: unknown, t: (key: string) => string): string {
   const err = toLocalizedError(raw);
   if (axios.isAxiosError(raw) && !raw.response) {
+    const tech = raw.code ? ` [${raw.code}]` : '';
     if (raw.code === 'ECONNABORTED' || /timeout/i.test(raw.message ?? '')) {
-      return t('auth.errTimeout');
+      return t('auth.errTimeout') + tech;
     }
-    return t('auth.errOffline');
+    return t('auth.errOffline') + tech;
   }
   if (err.status === 401) return t('auth.errBadCreds');
   if (err.status === 423) return t('auth.errLocked');
