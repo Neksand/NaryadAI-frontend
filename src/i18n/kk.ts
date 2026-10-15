@@ -176,7 +176,7 @@ export default {
     newOrder: 'Жаңа наряд',
     kind: 'Жұмыс түрі',
     crew: 'Бригада',
-    description: 'Мәселе сипаттамасы',
+    description: 'Атауы',
     equipment: 'Жабдық',
     area: 'Учаске',
     assignee: 'Орындаушы',

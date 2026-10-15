@@ -10,7 +10,8 @@ export async function compressImage(file: File): Promise<Blob> {
   // принимает до MAX_UPLOAD_BYTES, а честный отказ покажет понятный текст.
   try {
     const bitmap = await createImageBitmap(file);
-    const maxSide = 1600;
+    // 1280px/q0.72 ≈ 150–250 КБ: уходит даже на канале в единицы КБ/с.
+    const maxSide = 1280;
     const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
     const w = Math.round(bitmap.width * scale);
     const h = Math.round(bitmap.height * scale);
@@ -21,7 +22,7 @@ export async function compressImage(file: File): Promise<Blob> {
     if (!ctx) return file;
     ctx.drawImage(bitmap, 0, 0, w, h);
     if (typeof bitmap.close === 'function') bitmap.close();
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.8));
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.72));
     return blob ?? file;
   } catch {
     return file;
@@ -141,7 +142,8 @@ export async function uploadPhoto(
   const path = orderId ? `/work-orders/${orderId}/photos` : '/photos';
   const { data } = await api.post(path, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 30000,
+    // Медленный мобильный канал: 250 КБ на единицах КБ/с идут под две минуты.
+    timeout: 120000,
     onUploadProgress: (e) => {
       if (e.total && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     },

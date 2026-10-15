@@ -181,7 +181,7 @@ export default {
     newOrder: 'Новый наряд',
     kind: 'Тип работ',
     crew: 'Бригада',
-    description: 'Описание проблемы',
+    description: 'Название',
     equipment: 'Оборудование',
     area: 'Участок',
     assignee: 'Исполнитель',

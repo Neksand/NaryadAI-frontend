@@ -58,7 +58,7 @@ function renderNew() {
   );
 }
 
-const description = () => screen.getByLabelText(/Описание проблемы/);
+const description = () => screen.getByLabelText(/Название/);
 const submit = () => screen.getByRole('button', { name: 'Новый наряд' });
 const worker = () => screen.getByLabelText(/Исполнитель — человек или бригада/);
 const crew = () => screen.getByLabelText(/Бригада/);
@@ -120,14 +120,13 @@ describe('MasterNew creation boundaries', () => {
     expect(new Date(body.due_at as string).getFullYear()).toBe(2099);
   });
 
-  it('requires at least three non-whitespace description characters', async () => {
+  it('requires a non-empty title, crew keeps submit enabled', async () => {
     const u = userEvent.setup();
     renderNew();
     await fillCrewForm(u);
     await u.clear(description());
-    await u.type(description(), '  аб  ');
     expect(submit()).toBeDisabled();
-    await u.type(description(), 'в');
+    await u.type(description(), 'а');
     expect(submit()).toBeEnabled();
     await u.selectOptions(crew(), '');
     expect(submit()).toBeDisabled();
@@ -196,7 +195,7 @@ describe('MasterNew evidence and recommendations', () => {
     await u.upload(photoInput(), file);
     expect(photoInput()).toBeDisabled();
     expect(submit()).toBeDisabled();
-    expect(mocks.upload).toHaveBeenCalledWith(file, 'before');
+    expect(mocks.upload).toHaveBeenCalledWith(file, 'before', undefined, expect.any(Function));
     await act(async () => pending.resolve({ id: 'verified-photo' }));
     await waitFor(() => expect(submit()).toBeEnabled());
     await u.click(submit());

@@ -107,7 +107,7 @@ export function DateTimeField({
     <span className="flex flex-col gap-1">
       <span className="flex gap-1">
         <input
-          className="input mono grow"
+          className="input mono grow min-w-0"
           value={text}
           onChange={(e) => commit(e.target.value)}
           placeholder={t('common.datePh')}

@@ -231,7 +231,7 @@ it('captures downtime and comment and displays current worker availability', asy
   await u.selectOptions(screen.getByLabelText(/Участок/), 'a1');
   await u.selectOptions(screen.getByLabelText(/Оборудование/), 'e1');
   await u.type(screen.getByPlaceholderText('дд.мм.гггг, чч:мм'), '12.10.2026, 09:05');
-  await u.type(screen.getByLabelText(/Описание проблемы/), 'Течь масла из редуктора');
+  await u.type(screen.getByLabelText(/Название/), 'Течь масла из редуктора');
   await u.selectOptions(screen.getByLabelText(/Исполнитель — человек или бригада/), 'w1');
   await u.type(screen.getByLabelText('Комментарий'), '  Остановлено по инструкции  ');
   await u.click(screen.getByLabelText('Зафиксировать простой оборудования'));

@@ -52,6 +52,7 @@ export default function MasterNew() {
   const [photoIds, setPhotoIds] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   // Последний неуспешный файл для кнопки «Повторить» (повтор без перевыбора).
   const [pendingFailedFile, setPendingFailedFile] = useState<File | null>(null);
   // Offline draft photos: blobs in per-employee IndexedDB, uploaded before create.
@@ -201,9 +202,10 @@ export default function MasterNew() {
     }
     try {
       setUploadingPhoto(true);
+      setUploadPct(null);
       setPhotoError(null);
       const preview = makePreviewUrl(f);
-      const r = await uploadPhoto(f, 'before');
+      const r = await uploadPhoto(f, 'before', undefined, (pct) => setUploadPct(pct));
       if (preview) setPreviewUrls((p) => ({ ...p, [r.id]: preview }));
       setPhotoIds((p) => [...p, r.id]);
       setPendingFailedFile(null);
@@ -212,6 +214,7 @@ export default function MasterNew() {
       setPendingFailedFile(f);
     } finally {
       setUploadingPhoto(false);
+      setUploadPct(null);
     }
   };
 
@@ -261,7 +264,7 @@ export default function MasterNew() {
   const canSubmit =
     form.equipment_id &&
     form.due_at &&
-    form.description.trim().length >= 3 &&
+    form.description.trim().length >= 1 &&
     (form.assignee_id || form.crew_id) &&
     !create.isPending &&
     !uploadingPhoto;
@@ -325,7 +328,7 @@ export default function MasterNew() {
             )}
           </select>
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
           <label className="flex flex-col gap-1">
             <span className="label">{t('master.priority')}</span>
             <select
@@ -579,7 +582,12 @@ export default function MasterNew() {
               {photoLimitHint}
             </span>
           )}
-          {uploadingPhoto && <span role="status">{t('common.loading')}</span>}
+          {uploadingPhoto && (
+            <span role="status">
+              {t('common.loading')}
+              {uploadPct != null ? ` ${uploadPct}%` : ''}
+            </span>
+          )}
           {totalPhotos > 0 && (
             <span className="chip ok">
               <Icon name="check" size={14} /> {totalPhotos}
