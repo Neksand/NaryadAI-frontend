@@ -152,3 +152,7 @@ export async function listOrderPhotos(orderId: string): Promise<UploadResult[]> 
     return Array.isArray(data) ? data : (data.items ?? data.data ?? []);
   });
 }
+
+export async function deletePhoto(photoId: string): Promise<void> {
+  await api.delete(`/photos/${photoId}`);
+}

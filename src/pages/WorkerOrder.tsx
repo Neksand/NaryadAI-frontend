@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getWorkOrder, getOrderEvents, transitionOrder } from '../api/workOrders';
 import { dictList } from '../api/misc';
-import { uploadPhoto, listOrderPhotos, type PhotoKind } from '../api/photos';
+import { uploadPhoto, deletePhoto, listOrderPhotos, type PhotoKind } from '../api/photos';
 import { suggestFaultCode } from '../api/ai';
 import { Shell, roleTabs } from '../components/Shell';
 import { VoiceButton } from '../components/VoiceButton';
@@ -21,7 +21,7 @@ import { toLocalizedError, newUUID } from '../lib/api-client';
 import { formatDT } from '../lib/dates';
 import { pickName } from '../lib/names';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
-import { saveOfflinePhoto, type PendingPhotoRef } from '../lib/offline-photos';
+import { saveOfflinePhoto, removeOfflinePhotos, type PendingPhotoRef } from '../lib/offline-photos';
 import { useAuthStore } from '../store/auth-store';
 import { Icon } from '../components/Icon';
 import { OfflineQueuePanel } from '../components/OfflineQueuePanel';
@@ -85,6 +85,8 @@ export default function WorkerOrder() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   // Offline-first after-photos: blobs live in per-employee IndexedDB until replay.
   const [pendingOfflinePhotos, setPendingOfflinePhotos] = useState<PendingPhotoRef[]>([]);
+  const [offlinePreviewUrls, setOfflinePreviewUrls] = useState<Record<string, string>>({});
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const photoUserId = useAuthStore((s) => s.user?.id ?? 'anonymous');
 
   const needsReason = pendingAction === 'reject' || pendingAction === 'pause';
@@ -192,6 +194,15 @@ export default function WorkerOrder() {
       try {
         setPhotoError(null);
         const rec = await saveOfflinePhoto(photoUserId, file, kind, file.name);
+        let url: string | undefined;
+        try {
+          if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+            url = URL.createObjectURL(file);
+          }
+        } catch {
+          /* preview optional */
+        }
+        if (url) setOfflinePreviewUrls((p) => ({ ...p, [rec.localId]: url }));
         setPendingOfflinePhotos((p) =>
           p.length >= 5 ? p : [...p, { localId: rec.localId, kind: rec.kind }],
         );
@@ -208,9 +219,55 @@ export default function WorkerOrder() {
       setAfterPct(100);
       if (kind === 'after') setAfterDone(true);
       invalidate();
+      void orderPhotos.refetch();
     } catch (e) {
       setAfterPct(null);
       setPhotoError(toLocalizedError(e).message);
+    }
+  };
+
+  const handleDeleteServerPhoto = async (photoId: string) => {
+    if (typeof window !== 'undefined' && !window.confirm(t('admin.sureDelete'))) return;
+    try {
+      setPhotoError(null);
+      setDeletingPhotoId(photoId);
+      await deletePhoto(photoId);
+      const remainingServer = ((orderPhotos.data ?? []) as { id: string }[]).filter(
+        (p) => p.id !== photoId,
+      ).length;
+      if (remainingServer === 0 && pendingOfflinePhotos.length === 0) setAfterDone(false);
+      qc.setQueryData(['order', id, 'photos'], (old: unknown) =>
+        Array.isArray(old) ? old.filter((p: { id: string }) => p.id !== photoId) : old,
+      );
+      invalidate();
+    } catch (e) {
+      setPhotoError(toLocalizedError(e).message);
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
+  const handleDeleteOfflinePhoto = async (localId: string) => {
+    if (typeof window !== 'undefined' && !window.confirm(t('admin.sureDelete'))) return;
+    try {
+      setPhotoError(null);
+      setDeletingPhotoId(localId);
+      await removeOfflinePhotos(photoUserId, [localId]);
+      const remaining = pendingOfflinePhotos.filter((p) => p.localId !== localId);
+      setPendingOfflinePhotos(remaining);
+      setOfflinePreviewUrls((p) => {
+        const next = { ...p };
+        delete next[localId];
+        return next;
+      });
+      const hasServerAfter = ((orderPhotos.data ?? []) as { kind?: string }[]).some(
+        (p) => p.kind === 'after',
+      );
+      if (remaining.length === 0 && !hasServerAfter) setAfterDone(false);
+    } catch (e) {
+      setPhotoError(toLocalizedError(e).message);
+    } finally {
+      setDeletingPhotoId(null);
     }
   };
 
@@ -528,25 +585,99 @@ export default function WorkerOrder() {
             </label>
             <div className="flex flex-col gap-1">
               <span className="label">{t('worker.afterPhotos')}</span>
-              <label className="file-btn">
-                <Icon name="camera" size={22} /> {t('worker.afterPhotos')}
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/jpeg,image/png,image/webp"
-                  disabled={afterPct !== null && afterPct < 100}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void onPhoto(f, 'after');
-                  }}
-                />
-              </label>
+              <div className="flex gap-2">
+                <label className="file-btn">
+                  <Icon name="camera" size={22} /> Галерея
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    aria-label="Галерея"
+                    disabled={afterPct !== null && afterPct < 100}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      if (f) void onPhoto(f, 'after');
+                    }}
+                  />
+                </label>
+                <label className="file-btn">
+                  <Icon name="camera" size={22} /> Снять фото
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    capture="environment"
+                    aria-label="Снять фото"
+                    disabled={afterPct !== null && afterPct < 100}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      if (f) void onPhoto(f, 'after');
+                    }}
+                  />
+                </label>
+              </div>
               {afterPct !== null && (
                 <div
                   className="mono text-sm text-[var(--ink-muted)]"
                   aria-label={t('worker.afterPhotos')}
                 >
                   {t('worker.afterPhotos')}: {Math.round(afterPct)}%
+                </div>
+              )}
+              {((orderPhotos.data ?? []) as { id: string; kind?: string }[]).length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {((orderPhotos.data ?? []) as { id: string; kind?: string }[]).map((p) => (
+                    <div
+                      key={p.id}
+                      className="relative card !p-2"
+                      data-testid={`photo-preview-${p.id}`}
+                    >
+                      <div className="text-sm mono break-all">{p.id.slice(0, 8)}</div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger-o absolute top-1 right-1"
+                        aria-label={`Удалить фото ${p.id}`}
+                        disabled={deletingPhotoId === p.id}
+                        onClick={() => void handleDeleteServerPhoto(p.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {pendingOfflinePhotos.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {pendingOfflinePhotos.map((p) => (
+                    <div
+                      key={p.localId}
+                      className="relative card !p-2"
+                      data-testid={`photo-preview-${p.localId}`}
+                    >
+                      {offlinePreviewUrls[p.localId] ? (
+                        <img
+                          src={offlinePreviewUrls[p.localId]}
+                          alt={t('worker.afterPhotos')}
+                          className="w-full max-h-40 object-contain rounded"
+                        />
+                      ) : (
+                        <div className="text-sm mono break-all">
+                          {t('common.queued')}: {p.localId.slice(0, 8)}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger-o absolute top-1 right-1"
+                        aria-label={`Удалить фото ${p.localId}`}
+                        disabled={deletingPhotoId === p.localId}
+                        onClick={() => void handleDeleteOfflinePhoto(p.localId)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
               {pendingOfflinePhotos.length > 0 && (

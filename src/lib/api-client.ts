@@ -29,9 +29,7 @@ export const PRIMARY_API_URL = ENV_API_URL;
 // (loopback): у удалённого прод-сервера :8080 обычно закрыт firewall,
 // и автопереключение навсегда кладёт приложение. Поэтому для не-loopback
 // fallback отключён полностью.
-export const FALLBACK_API_URL = isLoopbackApi(ENV_API_URL)
-  ? alternateBase(ENV_API_URL)
-  : null;
+export const FALLBACK_API_URL = isLoopbackApi(ENV_API_URL) ? alternateBase(ENV_API_URL) : null;
 
 const BASE_KEY = 'naryadai.api-base';
 let activeBase: string = PRIMARY_API_URL;

@@ -17,7 +17,7 @@ const t = (key: string) => {
 describe('friendlyLoginError', () => {
   it('maps timeout without response', () => {
     const e = new AxiosError('timeout of 20000ms exceeded', 'ECONNABORTED');
-    expect(friendlyLoginError(e, t)).toBe('TIMEOUT');
+    expect(friendlyLoginError(e, t)).toBe('TIMEOUT [ECONNABORTED]');
   });
 
   it('maps timeout by message text', () => {
@@ -27,6 +27,11 @@ describe('friendlyLoginError', () => {
 
   it('maps offline without response', () => {
     expect(friendlyLoginError(new AxiosError('Network Error'), t)).toBe('OFFLINE');
+  });
+
+  it('appends axios code when present', () => {
+    const e = new AxiosError('Network Error', 'ERR_NETWORK');
+    expect(friendlyLoginError(e, t)).toBe('OFFLINE [ERR_NETWORK]');
   });
 
   it('maps 401 to bad credentials', () => {

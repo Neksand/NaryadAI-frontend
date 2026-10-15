@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { createWorkOrder, getSimilarRepairs } from '../api/workOrders';
 import { suggestAssignee } from '../api/ai';
 import { catalogList } from '../api/misc';
-import { uploadPhoto } from '../api/photos';
+import { uploadPhoto, deletePhoto } from '../api/photos';
 import { Shell, roleTabs } from '../components/Shell';
 import { VoiceButton } from '../components/VoiceButton';
 import { DateTimeField } from '../components/DateTimeField';
@@ -14,7 +14,7 @@ import { toLocalizedError, newUUID } from '../lib/api-client';
 import { pickName } from '../lib/names';
 import { Icon } from '../components/Icon';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
-import { saveOfflinePhoto, type PendingPhotoRef } from '../lib/offline-photos';
+import { saveOfflinePhoto, removeOfflinePhotos, type PendingPhotoRef } from '../lib/offline-photos';
 import { useAuthStore } from '../store/auth-store';
 
 export default function MasterNew() {
@@ -39,6 +39,8 @@ export default function MasterNew() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   // Offline draft photos: blobs in per-employee IndexedDB, uploaded before create.
   const [pendingLocalPhotos, setPendingLocalPhotos] = useState<PendingPhotoRef[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const [draftQueued, setDraftQueued] = useState(false);
   const offline = useOfflineQueue();
   const draftUserId = useAuthStore((s) => s.user?.id ?? 'anonymous');
@@ -137,6 +139,90 @@ export default function MasterNew() {
   });
 
   const totalPhotos = photoIds.length + pendingLocalPhotos.length;
+
+  const makePreviewUrl = (f: File | Blob): string | undefined => {
+    try {
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        return URL.createObjectURL(f);
+      }
+    } catch {
+      /* jsdom without object URLs — previews render as placeholders */
+    }
+    return undefined;
+  };
+
+  const handlePhotoFile = async (f: File) => {
+    if (uploadingPhoto || totalPhotos >= 5) return;
+    const offlineNow =
+      !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (offlineNow) {
+      try {
+        setUploadingPhoto(true);
+        setPhotoError(null);
+        const rec = await saveOfflinePhoto(draftUserId, f, 'before', f.name);
+        const url = makePreviewUrl(f);
+        if (url) setPreviewUrls((p) => ({ ...p, [rec.localId]: url }));
+        setPendingLocalPhotos((p) =>
+          p.length >= 5 ? p : [...p, { localId: rec.localId, kind: rec.kind }],
+        );
+      } catch (err) {
+        setPhotoError(toLocalizedError(err).message);
+      } finally {
+        setUploadingPhoto(false);
+      }
+      return;
+    }
+    try {
+      setUploadingPhoto(true);
+      setPhotoError(null);
+      const preview = makePreviewUrl(f);
+      const r = await uploadPhoto(f, 'before');
+      if (preview) setPreviewUrls((p) => ({ ...p, [r.id]: preview }));
+      setPhotoIds((p) => [...p, r.id]);
+    } catch (err) {
+      setPhotoError(toLocalizedError(err).message);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleDeleteUploaded = async (photoId: string) => {
+    if (typeof window !== 'undefined' && !window.confirm(t('admin.sureDelete'))) return;
+    try {
+      setPhotoError(null);
+      setDeletingPhotoId(photoId);
+      await deletePhoto(photoId);
+      setPhotoIds((p) => p.filter((id) => id !== photoId));
+      setPreviewUrls((p) => {
+        const next = { ...p };
+        delete next[photoId];
+        return next;
+      });
+    } catch (err) {
+      setPhotoError(toLocalizedError(err).message);
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
+  const handleDeleteOffline = async (localId: string) => {
+    if (typeof window !== 'undefined' && !window.confirm(t('admin.sureDelete'))) return;
+    try {
+      setPhotoError(null);
+      setDeletingPhotoId(localId);
+      await removeOfflinePhotos(draftUserId, [localId]);
+      setPendingLocalPhotos((p) => p.filter((item) => item.localId !== localId));
+      setPreviewUrls((p) => {
+        const next = { ...p };
+        delete next[localId];
+        return next;
+      });
+    } catch (err) {
+      setPhotoError(toLocalizedError(err).message);
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
 
   const canSubmit =
     form.equipment_id &&
@@ -414,52 +500,104 @@ export default function MasterNew() {
         </label>
         <div className="flex flex-col gap-1">
           <span className="label">{t('master.beforePhoto')}</span>
-          <label className="file-btn">
-            <Icon name="camera" size={22} /> {t('master.beforePhoto')}
-            <input
-              type="file"
-              className="hidden"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={uploadingPhoto || totalPhotos >= 5}
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (!f || uploadingPhoto || totalPhotos >= 5) return;
-                const offlineNow =
-                  !offline.online ||
-                  (typeof navigator !== 'undefined' && navigator.onLine === false);
-                if (offlineNow) {
-                  try {
-                    setUploadingPhoto(true);
-                    setPhotoError(null);
-                    const rec = await saveOfflinePhoto(draftUserId, f, 'before', f.name);
-                    setPendingLocalPhotos((p) =>
-                      p.length >= 5 ? p : [...p, { localId: rec.localId, kind: rec.kind }],
-                    );
-                  } catch (err) {
-                    setPhotoError(toLocalizedError(err).message);
-                  } finally {
-                    setUploadingPhoto(false);
-                  }
-                  return;
-                }
-                try {
-                  setUploadingPhoto(true);
-                  setPhotoError(null);
-                  const r = await uploadPhoto(f, 'before');
-                  setPhotoIds((p) => [...p, r.id]);
-                } catch (err) {
-                  setPhotoError(toLocalizedError(err).message);
-                } finally {
-                  setUploadingPhoto(false);
-                }
-              }}
-            />
-          </label>
+          <div className="flex gap-2">
+            <label className="file-btn">
+              <Icon name="camera" size={22} /> Галерея
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*"
+                aria-label="Галерея"
+                disabled={uploadingPhoto || totalPhotos >= 5}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  void handlePhotoFile(f);
+                }}
+              />
+            </label>
+            <label className="file-btn">
+              <Icon name="camera" size={22} /> Снять фото
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*"
+                capture="environment"
+                aria-label="Снять фото"
+                disabled={uploadingPhoto || totalPhotos >= 5}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  void handlePhotoFile(f);
+                }}
+              />
+            </label>
+          </div>
           {uploadingPhoto && <span role="status">{t('common.loading')}</span>}
           {totalPhotos > 0 && (
             <span className="chip ok">
               <Icon name="check" size={14} /> {totalPhotos}
             </span>
+          )}
+          {(photoIds.length > 0 || pendingLocalPhotos.length > 0) && (
+            <div className="grid grid-cols-2 gap-2">
+              {photoIds.map((photoId) => (
+                <div
+                  key={photoId}
+                  className="relative card !p-2"
+                  data-testid={`photo-preview-${photoId}`}
+                >
+                  {previewUrls[photoId] ? (
+                    <img
+                      src={previewUrls[photoId]}
+                      alt={t('master.beforePhoto')}
+                      className="w-full max-h-40 object-contain rounded"
+                    />
+                  ) : (
+                    <div className="text-sm mono break-all">{photoId}</div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger-o absolute top-1 right-1"
+                    aria-label={`Удалить фото ${photoId}`}
+                    disabled={deletingPhotoId === photoId}
+                    onClick={() => void handleDeleteUploaded(photoId)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {pendingLocalPhotos.map((p) => (
+                <div
+                  key={p.localId}
+                  className="relative card !p-2"
+                  data-testid={`photo-preview-${p.localId}`}
+                >
+                  {previewUrls[p.localId] ? (
+                    <img
+                      src={previewUrls[p.localId]}
+                      alt={t('master.beforePhoto')}
+                      className="w-full max-h-40 object-contain rounded"
+                    />
+                  ) : (
+                    <div className="text-sm mono break-all">
+                      {t('common.queued')}: {p.localId.slice(0, 8)}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger-o absolute top-1 right-1"
+                    aria-label={`Удалить фото ${p.localId}`}
+                    disabled={deletingPhotoId === p.localId}
+                    onClick={() => void handleDeleteOffline(p.localId)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
           {pendingLocalPhotos.length > 0 && (
             <span role="status" className="text-sm opacity-70">

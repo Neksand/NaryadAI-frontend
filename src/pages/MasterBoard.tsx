@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { listWorkOrders } from '../api/workOrders';
+import { CrewLoad } from '../components/CrewLoad';
 import { Shell, roleTabs } from '../components/Shell';
 import { EmptyState, ErrorState, OrderCard, SkeletonList } from '../components/ui';
 import { toLocalizedError } from '../lib/api-client';
@@ -100,6 +101,8 @@ export default function MasterBoard() {
         </Link>
         {q.data?.next_cursor && <span className="chip neutral">{t('common.next')}</span>}
       </div>
+
+      <CrewLoad />
 
       {q.isPending ? (
         <SkeletonList rows={4} />
