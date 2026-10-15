@@ -8,6 +8,7 @@ import {
   uploadPhoto,
   deletePhoto,
   describePhotoFailure,
+  ensureFileReadable,
   listOrderPhotos,
   type PhotoKind,
 } from '../api/photos';
@@ -230,6 +231,14 @@ export default function WorkerOrder() {
     if (isHeicFile(file)) {
       setPhotoError(
         t('worker.heicHint', 'HEIC не поддерживается: снимите камерой или выберите JPEG/PNG'),
+      );
+      return;
+    }
+    try {
+      await ensureFileReadable(file);
+    } catch (err) {
+      setPhotoError(
+        err instanceof Error ? err.message.replace(/^PHOTO_FILE_UNREADABLE:\s*/, '') : String(err),
       );
       return;
     }

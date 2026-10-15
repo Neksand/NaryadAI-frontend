@@ -21,7 +21,7 @@ const apiGetMock = vi.hoisted(() => vi.fn(async () => ({ data: [] })));
 vi.mock('../api/workOrders', () => woMocks);
 vi.mock('../api/ai', () => ({ suggestAssignee: aiMock }));
 vi.mock('../api/misc', () => ({ catalogList: miscMock }));
-vi.mock('../api/photos', () => ({ uploadPhoto: uploadMock, describePhotoFailure: () => 'diag' }));
+vi.mock('../api/photos', () => ({ uploadPhoto: uploadMock, describePhotoFailure: () => 'diag', ensureFileReadable: async () => {} }));
 vi.mock('../hooks/useWS', () => ({
   useRealtime: () => ({ status: 'closed', reconnected: false }),
 }));

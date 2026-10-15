@@ -23,7 +23,7 @@ vi.mock('../api/workOrders', () => ({
 }));
 vi.mock('../api/ai', () => ({ suggestAssignee: mocks.suggest }));
 vi.mock('../api/misc', () => ({ catalogList: mocks.catalog }));
-vi.mock('../api/photos', () => ({ uploadPhoto: mocks.upload, describePhotoFailure: () => 'diag' }));
+vi.mock('../api/photos', () => ({ uploadPhoto: mocks.upload, describePhotoFailure: () => 'diag', ensureFileReadable: async () => {} }));
 vi.mock('../hooks/useWS', () => ({
   useRealtime: () => ({ status: 'closed', reconnected: false }),
 }));

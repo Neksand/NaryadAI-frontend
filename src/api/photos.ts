@@ -35,9 +35,43 @@ export interface UploadResult {
   replayed?: boolean;
 }
 
+const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
+
+/** Чтение блоба с повторами: грант на URI в WebView иногда рвётся именно
+ *  в момент первого чтения (недописанный файл, SD-карта) и оживает через доли секунды. */
+export async function readBlobBytes(
+  blob: Blob,
+  maxBytes = 2_000_000,
+  attempts = 3,
+): Promise<ArrayBuffer | null> {
+  let lastError: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await blob.slice(0, Math.min(blob.size, maxBytes)).arrayBuffer();
+    } catch (e) {
+      lastError = e;
+      if (i + 1 < attempts) await sleep(400);
+    }
+  }
+  void lastError;
+  return null;
+}
+
+/** Предполётная проверка: файл должен читаться до любой сети. */
+export async function ensureFileReadable(file: Blob): Promise<void> {
+  const probe = await readBlobBytes(file, 262144, 3);
+  if (probe === null) {
+    throw new Error(
+      'PHOTO_FILE_UNREADABLE: файл недоступен на устройстве — выберите другой или снимите заново',
+    );
+  }
+}
+
 /** Read JPEG EXIF DateTimeOriginal before canvas compression strips the metadata. */
 export async function extractExifTakenAt(file: Blob): Promise<string | undefined> {
-  const bytes = new DataView(await file.slice(0, Math.min(file.size, 2_000_000)).arrayBuffer());
+  const buf = await readBlobBytes(file);
+  if (!buf) return undefined;
+  const bytes = new DataView(buf);
   const u8 = (offset: number) =>
     offset >= 0 && offset < bytes.byteLength ? bytes.getUint8(offset) : 0;
   const u16 = (offset: number, le: boolean) =>

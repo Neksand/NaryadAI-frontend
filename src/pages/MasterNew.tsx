@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { createWorkOrder, getSimilarRepairs } from '../api/workOrders';
 import { suggestAssignee } from '../api/ai';
 import { catalogList } from '../api/misc';
-import { uploadPhoto, deletePhoto, describePhotoFailure } from '../api/photos';
+import { uploadPhoto, deletePhoto, describePhotoFailure, ensureFileReadable } from '../api/photos';
 import { Shell, roleTabs } from '../components/Shell';
 import { VoiceButton } from '../components/VoiceButton';
 import { DateTimeField } from '../components/DateTimeField';
@@ -177,6 +177,14 @@ export default function MasterNew() {
     if (isHeicFile(f)) {
       setPhotoError(
         t('master.heicHint', 'HEIC не поддерживается: снимите камерой или выберите JPEG/PNG'),
+      );
+      return;
+    }
+    try {
+      await ensureFileReadable(f);
+    } catch (err) {
+      setPhotoError(
+        err instanceof Error ? err.message.replace(/^PHOTO_FILE_UNREADABLE:\s*/, '') : String(err),
       );
       return;
     }

@@ -17,6 +17,7 @@ const woMocks = vi.hoisted(() => ({
 }));
 const dictMock = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []));
 const photoMocks = vi.hoisted(() => ({
+  ensureFileReadable: async () => {},
   uploadPhoto: vi.fn(async () => ({ id: 'p1' })),
   listOrderPhotos: vi.fn(async () => []),
 }));

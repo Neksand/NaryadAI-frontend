@@ -16,6 +16,7 @@ const woMocks = vi.hoisted(() => ({
 const aiMock = vi.hoisted(() => vi.fn(async () => []));
 const miscMock = vi.hoisted(() => vi.fn(async () => []));
 const photoMocks = vi.hoisted(() => ({
+  ensureFileReadable: async () => {},
   uploadPhoto: vi.fn(async () => ({ id: 'ph1' })),
   deletePhoto: vi.fn(async () => {}),
   describePhotoFailure: (_f: unknown, _t: unknown, _e: unknown) => 'diag',

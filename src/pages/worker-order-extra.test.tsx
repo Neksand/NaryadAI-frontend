@@ -21,6 +21,7 @@ const photoMocks = vi.hoisted(() => ({
   uploadPhoto: vi.fn(async () => ({ id: 'p1' })),
   listOrderPhotos: vi.fn(async () => []),
   describePhotoFailure: () => 'diag',
+  ensureFileReadable: async () => {},
 }));
 const suggestMock = vi.hoisted(() => vi.fn(async () => null));
 
