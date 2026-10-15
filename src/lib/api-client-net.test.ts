@@ -81,8 +81,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-const PRIMARY = 'http://srv:8080/api/v1';
-const FALLBACK = 'http://srv/api/v1';
+const PRIMARY = 'http://localhost:8080/api/v1';
+const FALLBACK = 'http://localhost/api/v1';
 
 describe('api bases', () => {
   it('offers :8080 -> plain fallback', async () => {
@@ -93,9 +93,22 @@ describe('api bases', () => {
     expect(mod.getActiveApiBase()).toBe(PRIMARY);
   });
 
+  it('disables fallback for remote production hosts', async () => {
+    const mod = await load('http://79.108.166.207/api/v1');
+    expect(mod.FALLBACK_API_URL).toBeNull();
+    expect(mod.getApiBases()).toEqual(['http://79.108.166.207/api/v1']);
+    expect(mod.getActiveApiBase()).toBe('http://79.108.166.207/api/v1');
+  });
+
+  it('ignores a poisoned saved fallback base and heals to primary', async () => {
+    localStorage.setItem('naryadai.api-base', 'http://79.108.166.207:8080/api/v1');
+    const mod = await load('http://79.108.166.207/api/v1');
+    expect(mod.getActiveApiBase()).toBe('http://79.108.166.207/api/v1');
+  });
+
   it('offers plain -> :8080 fallback', async () => {
-    const mod = await load('http://srv/api/v1');
-    expect(mod.FALLBACK_API_URL).toBe('http://srv:8080/api/v1');
+    const mod = await load('http://localhost/api/v1');
+    expect(mod.FALLBACK_API_URL).toBe('http://localhost:8080/api/v1');
   });
 });
 
@@ -236,7 +249,7 @@ describe('401 refresh interceptor', () => {
       expect.anything(),
     );
     expect(mod.getActiveApiBase()).toBe(FALLBACK);
-    expect(localStorage.getItem('naryadai.api-base')).toBe(FALLBACK);
+    expect(localStorage.getItem('naryadai.api-base')).toBeNull();
   });
 
   it('failed refresh clears session and rejects', async () => {

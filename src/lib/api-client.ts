@@ -25,16 +25,21 @@ function alternateBase(url: string): string | null {
 }
 
 export const PRIMARY_API_URL = ENV_API_URL;
-// In local development, :80 is not a useful fallback for the backend on :8080.
-// It could be persisted after startup and make later launches miss the live API.
-export const FALLBACK_API_URL =
-  import.meta.env.DEV && isLoopbackApi(ENV_API_URL) ? null : alternateBase(ENV_API_URL);
+// Запасная база :80<->:8080 имеет смысл только для локального API
+// (loopback): у удалённого прод-сервера :8080 обычно закрыт firewall,
+// и автопереключение навсегда кладёт приложение. Поэтому для не-loopback
+// fallback отключён полностью.
+export const FALLBACK_API_URL = isLoopbackApi(ENV_API_URL)
+  ? alternateBase(ENV_API_URL)
+  : null;
 
 const BASE_KEY = 'naryadai.api-base';
 let activeBase: string = PRIMARY_API_URL;
 try {
+  // Принимаем только PRIMARY: сохранённый когда-то fallback (:8080) мог
+  // отравить запуски навсегда — такие установки самоисцеляются обновлением.
   const saved = localStorage.getItem(BASE_KEY);
-  if (saved && (saved === PRIMARY_API_URL || saved === FALLBACK_API_URL)) activeBase = saved;
+  if (saved && saved === PRIMARY_API_URL) activeBase = saved;
 } catch {
   /* ignore */
 }
@@ -52,7 +57,10 @@ function setActiveBase(url: string) {
   activeBase = url;
   api.defaults.baseURL = url;
   try {
-    localStorage.setItem(BASE_KEY, url);
+    // Персистим только PRIMARY: fallback живёт лишь в пределах сессии
+    // и никогда не переживает перезапуск.
+    if (url === PRIMARY_API_URL) localStorage.setItem(BASE_KEY, url);
+    else localStorage.removeItem(BASE_KEY);
   } catch {
     /* ignore */
   }
