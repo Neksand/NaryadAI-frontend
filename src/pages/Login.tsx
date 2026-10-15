@@ -8,7 +8,7 @@ import { useAuthStore, roleHome } from '../store/auth-store';
 import { toLocalizedError } from '../lib/api-client';
 import type { Role } from '../types/domain';
 import { Icon, type IconName } from '../components/Icon';
-import { API_URL, isLoopbackApi } from '../lib/env';
+import { SHOW_DEMO_LOGIN } from '../lib/env';
 
 export function friendlyLoginError(raw: unknown, t: (key: string) => string): string {
   const err = toLocalizedError(raw);
@@ -133,7 +133,7 @@ export default function LoginPage() {
           {m.isPending ? t('common.loading') : t('auth.submit')}
         </button>
       </form>
-      {isLoopbackApi(API_URL) && (
+      {SHOW_DEMO_LOGIN && (
         <div className="card flex flex-col gap-2">
           <div className="text-sm font-semibold">{t('auth.demoTitle')}</div>
           <div className="text-sm text-[var(--ink-muted)]">{t('auth.demoHint')}</div>

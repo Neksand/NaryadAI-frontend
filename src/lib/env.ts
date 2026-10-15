@@ -21,6 +21,12 @@ export function isLoopbackApi(url: string): boolean {
   }
 }
 
+// Явный флаг для демо-стендов (жюри): VITE_DEMO_LOGIN=true показывает
+// панель быстрого входа с синтетическими аккаунтами и на прод-сборке.
+// Без флага панель видна только при loopback-API, чтобы не светить демо-PIN.
+export const SHOW_DEMO_LOGIN =
+  import.meta.env.VITE_DEMO_LOGIN === 'true' || isLoopbackApi(API_URL);
+
 export function websocketUrlWithToken(
   websocketUrl: string,
   token: string,
