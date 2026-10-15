@@ -108,7 +108,7 @@ describe('WorkerOrder photo retry', () => {
     photoMocks.uploadPhoto.mockRejectedValueOnce(new Error('network fail'));
     renderOrder([]);
     await openComplete(u);
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     const file = new File(['img'], 'after.jpg', { type: 'image/jpeg' });
     await u.upload(gallery, file);
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
@@ -129,10 +129,9 @@ describe('WorkerOrder photo retry', () => {
     renderOrder(ten);
     await openComplete(u);
     expect(await screen.findByText('Фото 10 из 10')).toBeTruthy();
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
-    const camera = (await screen.findByLabelText('Снять фото')) as HTMLInputElement;
-    expect(gallery.disabled).toBe(true);
-    expect(camera.disabled).toBe(true);
+    const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    expect(screen.queryByLabelText('Снять фото')).toBeNull();
+    expect(picker.disabled).toBe(true);
     expect(await screen.findByRole('note')).toBeTruthy();
     // Лимит не пускает в сеть
     expect(photoMocks.uploadPhoto).not.toHaveBeenCalled();
@@ -143,7 +142,7 @@ describe('WorkerOrder photo retry', () => {
     renderOrder([{ id: 'srv0', kind: 'after' }]);
     await openComplete(u);
     expect(await screen.findByText('Фото 1 из 10')).toBeTruthy();
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     expect(gallery.disabled).toBe(false);
   });
 
@@ -151,7 +150,7 @@ describe('WorkerOrder photo retry', () => {
     const u = userEvent.setup();
     renderOrder([]);
     await openComplete(u);
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['heic'], 'img.HEIC', { type: 'image/jpeg' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toMatch(/снимите камерой/i);
@@ -160,7 +159,7 @@ describe('WorkerOrder photo retry', () => {
     expect(offlinePhotoMocks.saveOfflinePhoto).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull();
 
-    const gallery2 = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery2 = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery2, new File(['heic'], 'img.jpg', { type: 'image/heif' }));
     const alert2 = await screen.findByRole('alert');
     expect(alert2.textContent).toMatch(/JPEG\/PNG/);
@@ -173,7 +172,7 @@ describe('WorkerOrder photo retry', () => {
     await openComplete(u);
     await u.type(screen.getByLabelText(/Что сделано/), 'Заменил подшипник');
     photoMocks.uploadPhoto.mockRejectedValueOnce(new Error('flaky'));
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['x'], 'fail.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole('alert')).toBeTruthy();

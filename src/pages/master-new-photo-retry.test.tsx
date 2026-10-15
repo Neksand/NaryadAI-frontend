@@ -93,7 +93,7 @@ describe('MasterNew photo retry', () => {
     photoMocks.uploadPhoto.mockRejectedValueOnce(new Error('network fail'));
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     const file = new File(['img'], 'a.jpg', { type: 'image/jpeg' });
     await u.upload(gallery, file);
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
@@ -112,6 +112,21 @@ describe('MasterNew photo retry', () => {
     expect(await screen.findByLabelText('Удалить фото ph2')).toBeTruthy();
   });
 
+  it('возврат из фона сам повторяет неуспешное фото', async () => {
+    const u = userEvent.setup();
+    photoMocks.uploadPhoto.mockRejectedValueOnce(new Error('killed in background'));
+    renderNew();
+    await screen.findByRole('option', { name: 'Участок 1' });
+    const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await u.upload(picker, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
+    await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('button', { name: 'Повторить' })).toBeTruthy();
+    photoMocks.uploadPhoto.mockResolvedValueOnce({ id: 'ph9' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
   it('счётчик и дизейбл на лимите 5', async () => {
     const u = userEvent.setup();
     let n = 0;
@@ -121,16 +136,15 @@ describe('MasterNew photo retry', () => {
     // Стартовый счётчик
     expect(await screen.findByText('Фото 0 из 5')).toBeTruthy();
     for (let i = 0; i < 5; i++) {
-      const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+      const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
       await u.upload(gallery, new File([`img${i}`], `p${i}.jpg`, { type: 'image/jpeg' }));
       await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(i + 1));
     }
     expect(await screen.findByText('Фото 5 из 5')).toBeTruthy();
     // input дизейблится с подсказкой
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
-    const camera = (await screen.findByLabelText('Снять фото')) as HTMLInputElement;
-    expect(gallery.disabled).toBe(true);
-    expect(camera.disabled).toBe(true);
+    const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    expect(screen.queryByLabelText('Снять фото')).toBeNull();
+    expect(picker.disabled).toBe(true);
     expect(await screen.findByRole('note')).toBeTruthy();
     // Лишний файл не грузится
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(5));
@@ -140,7 +154,7 @@ describe('MasterNew photo retry', () => {
     const u = userEvent.setup();
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['heic'], 'photo.heic', { type: 'image/heic' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toMatch(/снимите камерой/i);
@@ -151,7 +165,7 @@ describe('MasterNew photo retry', () => {
     expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull();
 
     // Вариант по MIME-типу
-    const gallery2 = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery2 = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery2, new File(['heic'], 'photo.jpg', { type: 'image/heic' }));
     const alert2 = await screen.findByRole('alert');
     expect(alert2.textContent).toMatch(/JPEG\/PNG/);
@@ -164,7 +178,7 @@ describe('MasterNew photo retry', () => {
     photoMocks.uploadPhoto.mockImplementation(async () => ({ id: `ok${++n}` }));
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['one'], 'one.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
     expect(await screen.findByLabelText('Удалить фото ok1')).toBeTruthy();
@@ -178,7 +192,7 @@ describe('MasterNew photo retry', () => {
 
     // Вторая загрузка падает
     photoMocks.uploadPhoto.mockRejectedValueOnce(new Error('flaky network'));
-    const gallery2 = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery2 = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery2, new File(['two'], 'two.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole('alert')).toBeTruthy();

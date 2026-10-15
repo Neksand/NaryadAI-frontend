@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -222,6 +222,22 @@ export default function MasterNew() {
     if (uploadingPhoto || !pendingFailedFile) return;
     void handlePhotoFile(pendingFailedFile);
   };
+
+  // Возврат из камеры/сна часто убивает висящую загрузку: при появлении сети
+  // или foreground автоматически повторяем последний неуспешный файл.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const maybeResume = () => {
+      if (document.visibilityState === 'hidden') return;
+      handleRetryPhoto();
+    };
+    window.addEventListener('online', maybeResume);
+    document.addEventListener('visibilitychange', maybeResume);
+    return () => {
+      window.removeEventListener('online', maybeResume);
+      document.removeEventListener('visibilitychange', maybeResume);
+    };
+  });
 
   const handleDeleteUploaded = async (photoId: string) => {
     if (typeof window !== 'undefined' && !window.confirm(t('admin.sureDelete'))) return;
@@ -542,30 +558,12 @@ export default function MasterNew() {
           </span>
           <div className="flex gap-2">
             <label className="file-btn">
-              <Icon name="camera" size={22} /> Галерея
+              <Icon name="camera" size={22} /> {t('master.photoPick', 'Выбрать фото')}
               <input
                 type="file"
                 className="hidden"
                 accept="image/*"
-                aria-label="Галерея"
-                disabled={uploadingPhoto || isPhotoLimitReached}
-                title={isPhotoLimitReached ? photoLimitHint : undefined}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!f) return;
-                  void handlePhotoFile(f);
-                }}
-              />
-            </label>
-            <label className="file-btn">
-              <Icon name="camera" size={22} /> Снять фото
-              <input
-                type="file"
-                className="hidden"
-                accept="image/*"
-                capture="environment"
-                aria-label="Снять фото"
+                aria-label={t('master.photoPick', 'Выбрать фото')}
                 disabled={uploadingPhoto || isPhotoLimitReached}
                 title={isPhotoLimitReached ? photoLimitHint : undefined}
                 onChange={(e) => {

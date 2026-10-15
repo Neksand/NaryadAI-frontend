@@ -105,16 +105,14 @@ beforeEach(() => {
 });
 
 describe('WorkerOrder photo pickers', () => {
-  it('renders Gallery and Camera buttons with required attributes', async () => {
+  it('renders a single system picker without capture split', async () => {
     const u = userEvent.setup();
     renderOrder();
     await openComplete(u);
-    const gallery = await screen.findByLabelText('Галерея');
-    const camera = await screen.findByLabelText('Снять фото');
-    expect(gallery).toHaveAttribute('accept', 'image/*');
-    expect(gallery).not.toHaveAttribute('capture');
-    expect(camera).toHaveAttribute('accept', 'image/*');
-    expect(camera.getAttribute('capture')).toBe('environment');
+    const picker = await screen.findByLabelText('Выбрать фото');
+    expect(picker).toHaveAttribute('accept', 'image/*');
+    expect(picker).not.toHaveAttribute('capture');
+    expect(screen.queryByLabelText('Снять фото')).toBeNull();
   });
 });
 
@@ -152,7 +150,7 @@ describe('WorkerOrder photo delete', () => {
     queueState.online = false;
     renderOrder([]);
     await openComplete(u);
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['img'], 'after.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(offlinePhotoMocks.saveOfflinePhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото loc-after-1');

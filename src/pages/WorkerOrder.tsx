@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -279,6 +279,21 @@ export default function WorkerOrder() {
     if (!failedPhoto || uploadingAfter) return;
     void onPhoto(failedPhoto.file, failedPhoto.kind);
   };
+
+  // Возврат из камеры/сна: автоматически повторяем неуспешное фото.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const maybeResume = () => {
+      if (document.visibilityState === 'hidden') return;
+      handleRetryPhoto();
+    };
+    window.addEventListener('online', maybeResume);
+    document.addEventListener('visibilitychange', maybeResume);
+    return () => {
+      window.removeEventListener('online', maybeResume);
+      document.removeEventListener('visibilitychange', maybeResume);
+    };
+  });
 
   const handleDeleteServerPhoto = async (photoId: string) => {
     if (typeof window !== 'undefined' && !window.confirm(t('admin.sureDelete'))) return;
@@ -644,33 +659,12 @@ export default function WorkerOrder() {
               </span>
               <div className="flex gap-2">
                 <label className="file-btn">
-                  <Icon name="camera" size={22} /> Галерея
+                  <Icon name="camera" size={22} /> {t('worker.photoPick', 'Выбрать фото')}
                   <input
                     type="file"
                     className="hidden"
                     accept="image/*"
-                    aria-label="Галерея"
-                    disabled={uploadingAfter || isAfterLimitReached}
-                    title={
-                      isAfterLimitReached
-                        ? t('worker.photoLimit', 'Достигнут лимит: максимум 10 фото')
-                        : undefined
-                    }
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = '';
-                      if (f) void onPhoto(f, 'after');
-                    }}
-                  />
-                </label>
-                <label className="file-btn">
-                  <Icon name="camera" size={22} /> Снять фото
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    capture="environment"
-                    aria-label="Снять фото"
+                    aria-label={t('worker.photoPick', 'Выбрать фото')}
                     disabled={uploadingAfter || isAfterLimitReached}
                     title={
                       isAfterLimitReached

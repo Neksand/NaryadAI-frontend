@@ -142,8 +142,10 @@ export async function uploadPhoto(
   const path = orderId ? `/work-orders/${orderId}/photos` : '/photos';
   const { data } = await api.post(path, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    // Медленный мобильный канал: 250 КБ на единицах КБ/с идут под две минуты.
-    timeout: 120000,
+    // Таймаута нет осознанно: на рвущемся канале запрос может висеть;
+    // прогресс виден, повтор/отмена — у пользователя. Дубликаты схлопываются
+    // сервером по sha256 (replayed:true), зависший запрос вреда не наносит.
+    timeout: 0,
     onUploadProgress: (e) => {
       if (e.total && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     },

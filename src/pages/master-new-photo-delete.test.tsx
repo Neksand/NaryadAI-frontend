@@ -88,16 +88,13 @@ beforeEach(() => {
 });
 
 describe('MasterNew photo pickers', () => {
-  it('renders Gallery and Camera buttons with required attributes', async () => {
+  it('renders a single system picker without capture split', async () => {
     renderNew();
-    const gallery = await screen.findByLabelText('Галерея');
-    const camera = await screen.findByLabelText('Снять фото');
-    expect(gallery).toHaveAttribute('accept', 'image/*');
-    expect(gallery).not.toHaveAttribute('capture');
-    expect(camera).toHaveAttribute('accept', 'image/*');
-    expect(camera.getAttribute('capture')).toBe('environment');
-    expect(screen.getByText('Галерея')).toBeTruthy();
-    expect(screen.getByText('Снять фото')).toBeTruthy();
+    const picker = await screen.findByLabelText('Выбрать фото');
+    expect(picker).toHaveAttribute('accept', 'image/*');
+    expect(picker).not.toHaveAttribute('capture');
+    expect(screen.queryByLabelText('Снять фото')).toBeNull();
+    expect(screen.getByText('Выбрать фото')).toBeTruthy();
   });
 });
 
@@ -106,7 +103,7 @@ describe('MasterNew photo delete', () => {
     const u = userEvent.setup();
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото ph1');
@@ -126,7 +123,7 @@ describe('MasterNew photo delete', () => {
     photoMocks.deletePhoto.mockRejectedValueOnce(new Error('delete failed'));
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото ph1');
@@ -146,7 +143,7 @@ describe('MasterNew photo delete', () => {
     queueMocks.online = false;
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['img'], 'b.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(offlinePhotoMocks.saveOfflinePhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото loc1');
@@ -161,7 +158,7 @@ describe('MasterNew photo delete', () => {
     (window.confirm as unknown as ReturnType<typeof vi.spyOn>).mockReturnValueOnce(false);
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
-    const gallery = (await screen.findByLabelText('Галерея')) as HTMLInputElement;
+    const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     await u.upload(gallery, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото ph1');
