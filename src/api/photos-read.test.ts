@@ -42,6 +42,33 @@ describe('readBlobBytes', () => {
   });
 });
 
+describe('ensureFileReadable full read', () => {
+  it('rejects partially readable files that break past the head', async () => {
+    const flaky = {
+      size: 800 * 1024,
+      slice: (start: number, end: number) => ({
+        arrayBuffer: async () => {
+          if (end - start > 262144) throw new DOMException('torn grant', 'NotReadableError');
+          return new ArrayBuffer(end - start);
+        },
+      }),
+    };
+    await expect(ensureFileReadable(flaky as unknown as Blob)).rejects.toThrow(
+      /недоступен на устройстве/,
+    );
+  });
+
+  it('accepts fully readable files', async () => {
+    const good = {
+      size: 1024,
+      slice: (start: number, end: number) => ({
+        arrayBuffer: async () => new ArrayBuffer(end - start),
+      }),
+    };
+    await expect(ensureFileReadable(good as unknown as Blob)).resolves.toBeUndefined();
+  });
+});
+
 describe('ensureFileReadable', () => {
   it('throws a human message for unreadable files', async () => {
     const dead = {

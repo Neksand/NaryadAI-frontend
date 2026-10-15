@@ -57,9 +57,11 @@ export async function readBlobBytes(
   return null;
 }
 
-/** Предполётная проверка: файл должен читаться до любой сети. */
+/** Предполётная проверка: файл должен читаться ЦЕЛИКОМ до любой сети.
+ *  Частичная читаемость (первые КБ ок, дальше обрыв) — штатный случай
+ *  рвущихся грантов WebView, поэтому пробуем весь файл, а не первые байты. */
 export async function ensureFileReadable(file: Blob): Promise<void> {
-  const probe = await readBlobBytes(file, 262144, 3);
+  const probe = await readBlobBytes(file, file.size, 3);
   if (probe === null) {
     throw new Error(
       'PHOTO_FILE_UNREADABLE: файл недоступен на устройстве — выберите другой или снимите заново',

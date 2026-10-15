@@ -60,6 +60,9 @@ export default function MasterNew() {
   const [pendingLocalPhotos, setPendingLocalPhotos] = useState<PendingPhotoRef[]>([]);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [brokenPreviews, setBrokenPreviews] = useState<Record<string, true>>({});
+  const markBroken = (key: string) =>
+    setBrokenPreviews((p) => (p[key] ? p : { ...p, [key]: true as const }));
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [draftQueued, setDraftQueued] = useState(false);
   const offline = useOfflineQueue();
@@ -614,7 +617,7 @@ export default function MasterNew() {
                   className="relative card !p-2"
                   data-testid={`photo-preview-${photoId}`}
                 >
-                  {previewUrls[photoId] ? (
+                  {previewUrls[photoId] && !brokenPreviews[photoId] ? (
                     <button
                       type="button"
                       className="block w-full !p-0 !border-0 !bg-transparent"
@@ -625,10 +628,15 @@ export default function MasterNew() {
                         src={previewUrls[photoId]}
                         alt={t('master.beforePhoto')}
                         className="w-full max-h-40 object-contain rounded"
+                        onError={() => markBroken(photoId)}
                       />
                     </button>
                   ) : (
-                    <div className="text-sm mono break-all">{photoId}</div>
+                    <div className="text-sm mono break-all">
+                      {brokenPreviews[photoId]
+                        ? t('master.photoNoPreview', 'Превью недоступно')
+                        : photoId}
+                    </div>
                   )}
                   <button
                     type="button"
@@ -647,7 +655,7 @@ export default function MasterNew() {
                   className="relative card !p-2"
                   data-testid={`photo-preview-${p.localId}`}
                 >
-                  {previewUrls[p.localId] ? (
+                  {previewUrls[p.localId] && !brokenPreviews[p.localId] ? (
                     <button
                       type="button"
                       className="block w-full !p-0 !border-0 !bg-transparent"
@@ -658,11 +666,14 @@ export default function MasterNew() {
                         src={previewUrls[p.localId]}
                         alt={t('master.beforePhoto')}
                         className="w-full max-h-40 object-contain rounded"
+                        onError={() => markBroken(p.localId)}
                       />
                     </button>
                   ) : (
                     <div className="text-sm mono break-all">
-                      {t('common.queued')}: {p.localId.slice(0, 8)}
+                      {brokenPreviews[p.localId]
+                        ? t('master.photoNoPreview', 'Превью недоступно')
+                        : `${t('common.queued')}: ${p.localId.slice(0, 8)}`}
                     </div>
                   )}
                   <button
@@ -680,8 +691,10 @@ export default function MasterNew() {
           )}
           {(() => {
             const keys = [
-              ...photoIds.filter((id) => previewUrls[id]),
-              ...pendingLocalPhotos.map((p) => p.localId).filter((id) => previewUrls[id]),
+              ...photoIds.filter((id) => previewUrls[id] && !brokenPreviews[id]),
+              ...pendingLocalPhotos
+                .map((p) => p.localId)
+                .filter((id) => previewUrls[id] && !brokenPreviews[id]),
             ];
             const items: LightboxItem[] = keys.map((key) => ({
               src: previewUrls[key],

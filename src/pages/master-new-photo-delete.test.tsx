@@ -99,6 +99,30 @@ describe('MasterNew photo pickers', () => {
   });
 });
 
+describe('MasterNew broken preview', () => {
+  it('replaces a broken thumbnail with a placeholder, keeps delete working', async () => {
+    const u = userEvent.setup();
+    const realCreate = URL.createObjectURL;
+    // @ts-expect-error jsdom lacks createObjectURL
+    URL.createObjectURL = () => 'blob:preview';
+    try {
+      renderNew();
+      await screen.findByRole('option', { name: 'Участок 1' });
+      const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+      await u.upload(picker, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
+      await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
+      const img = (await screen.findByAltText('Фото «до»')) as HTMLImageElement;
+      const { fireEvent } = await import('@testing-library/react');
+      fireEvent.error(img);
+      expect(await screen.findByText('Превью недоступно')).toBeTruthy();
+      expect(screen.queryByAltText('Фото «до»')).toBeNull();
+      expect(await screen.findByLabelText('Удалить фото ph1')).toBeTruthy();
+    } finally {
+      URL.createObjectURL = realCreate;
+    }
+  });
+});
+
 describe('MasterNew photo delete', () => {
   it('happy-path: deletes uploaded photo, keeps form', async () => {
     const u = userEvent.setup();

@@ -115,6 +115,9 @@ export default function WorkerOrder() {
   // Последний неуспешный файл для кнопки «Повторить» (повтор без перевыбора).
   const [failedPhoto, setFailedPhoto] = useState<{ file: File; kind: PhotoKind } | null>(null);
   const [lightbox, setLightbox] = useState<{ items: LightboxItem[]; index: number } | null>(null);
+  const [brokenPreviews, setBrokenPreviews] = useState<Record<string, true>>({});
+  const markBroken = (key: string) =>
+    setBrokenPreviews((p) => (p[key] ? p : { ...p, [key]: true as const }));
   const [lightboxLoading, setLightboxLoading] = useState(false);
   // Offline-first after-photos: blobs live in per-employee IndexedDB until replay.
   const [pendingOfflinePhotos, setPendingOfflinePhotos] = useState<PendingPhotoRef[]>([]);
@@ -316,7 +319,10 @@ export default function WorkerOrder() {
   };
 
   const openOfflinePhoto = (localId: string) => {
-    const keys = pendingOfflinePhotos.map((p) => p.localId).filter((id) => offlinePreviewUrls[id]);
+    if (brokenPreviews[localId]) return;
+    const keys = pendingOfflinePhotos
+      .map((p) => p.localId)
+      .filter((id) => offlinePreviewUrls[id] && !brokenPreviews[id]);
     const at = keys.indexOf(localId);
     if (at < 0) return;
     setLightbox({
@@ -774,7 +780,7 @@ export default function WorkerOrder() {
                       className="relative card !p-2"
                       data-testid={`photo-preview-${p.localId}`}
                     >
-                      {offlinePreviewUrls[p.localId] ? (
+                      {offlinePreviewUrls[p.localId] && !brokenPreviews[p.localId] ? (
                         <button
                           type="button"
                           className="block w-full !p-0 !border-0 !bg-transparent"
@@ -785,11 +791,14 @@ export default function WorkerOrder() {
                             src={offlinePreviewUrls[p.localId]}
                             alt={t('worker.afterPhotos')}
                             className="w-full max-h-40 object-contain rounded"
+                            onError={() => markBroken(p.localId)}
                           />
                         </button>
                       ) : (
                         <div className="text-sm mono break-all">
-                          {t('common.queued')}: {p.localId.slice(0, 8)}
+                          {brokenPreviews[p.localId]
+                            ? t('worker.photoNoPreview', 'Превью недоступно')
+                            : `${t('common.queued')}: ${p.localId.slice(0, 8)}`}
                         </div>
                       )}
                       <button
