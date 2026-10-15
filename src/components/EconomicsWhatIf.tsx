@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { analyticsGet } from '../api/misc';
 import { toLocalizedError } from '../lib/api-client';
+import { useAuthStore } from '../store/auth-store';
 import { ErrorState, SkeletonList } from './ui';
+import {
+  PriceTable,
+  calcMaterialsCost,
+  parseMaterialRows,
+  useMaterialPrices,
+  validPricesOf,
+} from './PriceTable';
 
 /**
  * Базовый сценарий экономики.
@@ -144,7 +152,17 @@ function fmtPct(v: number): string {
   return `${(v * 100).toFixed(1)}%`;
 }
 
-export function EconomicsWhatIf({ base: baseProp }: { base?: EconomicsBase }) {
+export function EconomicsWhatIf({
+  base: baseProp,
+  materials: materialsProp,
+  userId: userIdProp,
+}: {
+  base?: EconomicsBase;
+  /** Сырой ответ analyticsGet('materials') — в тестах/шовe витрины; иначе грузим сами. */
+  materials?: unknown;
+  /** Переопределение пользователя для изоляции цен (по умолчанию — из auth-store). */
+  userId?: string;
+}) {
   const { t } = useTranslation();
   const query = useQuery({
     queryKey: ['analytics', 'economics-whatif'],
@@ -152,7 +170,16 @@ export function EconomicsWhatIf({ base: baseProp }: { base?: EconomicsBase }) {
     enabled: baseProp === undefined,
     staleTime: 60000,
   });
+  const materialsQuery = useQuery({
+    queryKey: ['analytics', 'materials'],
+    queryFn: () => analyticsGet('materials'),
+    enabled: baseProp === undefined && materialsProp === undefined,
+    staleTime: 60000,
+  });
   const base = baseProp ?? query.data ?? null;
+  const materialsData = materialsProp ?? materialsQuery.data ?? null;
+  const authUserId = useAuthStore((s) => s.user?.id ?? 'anonymous');
+  const userId = userIdProp ?? authUserId;
 
   // Цена — всегда гипотеза пользователя (слайдер). Если бэкенд цену не отдал,
   // это честно помечается в допущениях, а не выдаётся за данные.
@@ -160,7 +187,18 @@ export function EconomicsWhatIf({ base: baseProp }: { base?: EconomicsBase }) {
   const [normPct, setNormPct] = useState(0);
   const [horizon, setHorizon] = useState(12);
 
-  if (baseProp === undefined && query.isPending) return <SkeletonList rows={2} />;
+  // Витрина «ваши цены»: справочник материалов цен не отдаёт, поэтому мастер
+  // вводит цену за единицу сам; monthlyMaterialsCost = Σ(qty × цена).
+  const materialRows = useMemo(() => parseMaterialRows(materialsData), [materialsData]);
+  const { drafts, setDraft, reset } = useMaterialPrices(userId);
+  const userCost = useMemo(
+    () => calcMaterialsCost(materialRows, validPricesOf(drafts)),
+    [materialRows, drafts],
+  );
+  const usingUserPrices = userCost.total != null;
+
+  if (baseProp === undefined && (query.isPending || materialsQuery.isPending))
+    return <SkeletonList rows={2} />;
   if (baseProp === undefined && query.isError)
     return (
       <ErrorState
@@ -172,12 +210,22 @@ export function EconomicsWhatIf({ base: baseProp }: { base?: EconomicsBase }) {
 
   const effectivePrice = price ?? base.downtimeCostPerHour ?? WHATIF_DEFAULT_PRICE;
   const priceAssumed = base.downtimeCostPerHour == null;
-  const result = calcWhatIf(base, {
+  // Введённые цены перекрывают бэкенд-оценку затрат на материалы; без них — как было.
+  const effectiveBase: EconomicsBase = usingUserPrices
+    ? { ...base, monthlyMaterialsCost: userCost.total }
+    : base;
+  const result = calcWhatIf(effectiveBase, {
     pricePerHour: effectivePrice,
     materialsNormPct: normPct,
     horizonMonths: horizon,
   });
   const unknown = t('economics.whatifUnknown');
+  const yourPrices = usingUserPrices ? (
+    <span className="text-xs font-normal text-[var(--ink-muted)]" data-testid="whatif-your-prices">
+      {' '}
+      · {t('economics.whatifPriceBadge')}
+    </span>
+  ) : null;
 
   return (
     <section className="card flex flex-col gap-3" aria-label={t('economics.whatifTitle')}>
@@ -231,30 +279,46 @@ export function EconomicsWhatIf({ base: baseProp }: { base?: EconomicsBase }) {
 
       <dl className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="kpi">
-          <dt className="l">{t('economics.whatifBenefit')}</dt>
+          <dt className="l">
+            {t('economics.whatifBenefit')}
+            {yourPrices}
+          </dt>
           <dd className="v num" data-testid="whatif-benefit">
             {result.monthlyBenefit == null ? unknown : fmtMoney(result.monthlyBenefit)}
           </dd>
         </div>
         <div className="kpi">
-          <dt className="l">{t('economics.whatifNet')}</dt>
+          <dt className="l">
+            {t('economics.whatifNet')}
+            {yourPrices}
+          </dt>
           <dd className="v num" data-testid="whatif-net">
             {result.monthlyNet == null ? unknown : fmtMoney(result.monthlyNet)}
           </dd>
         </div>
         <div className="kpi">
-          <dt className="l">{t('economics.whatifNpv')}</dt>
+          <dt className="l">
+            {t('economics.whatifNpv')}
+            {yourPrices}
+          </dt>
           <dd className="v num" data-testid="whatif-npv">
             {result.npv == null ? unknown : fmtMoney(result.npv)}
           </dd>
         </div>
         <div className="kpi">
-          <dt className="l">{t('economics.whatifRoi')}</dt>
+          <dt className="l">
+            {t('economics.whatifRoi')}
+            {yourPrices}
+          </dt>
           <dd className="v num" data-testid="whatif-roi">
             {result.roi == null ? unknown : fmtPct(result.roi)}
           </dd>
         </div>
       </dl>
+
+      {materialRows.length > 0 && (
+        <PriceTable rows={materialRows} drafts={drafts} onDraftChange={setDraft} onReset={reset} />
+      )}
 
       <div className="text-sm text-[var(--ink-muted)]">
         <b>{t('economics.whatifAssumptions')}</b>
@@ -263,6 +327,7 @@ export function EconomicsWhatIf({ base: baseProp }: { base?: EconomicsBase }) {
           <li>{t('economics.whatifAssumptionRate')}</li>
           <li>{t('economics.whatifAssumptionRoi')}</li>
           {priceAssumed && <li>{t('economics.whatifAssumptionPrice')}</li>}
+          {usingUserPrices && <li>{t('economics.whatifPriceAssumption')}</li>}
         </ul>
       </div>
     </section>

@@ -18,7 +18,9 @@ android {
     compileSdk = 37
     namespace = "kz.naryad.ai"
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
+        // IP-stage: backend is plain HTTP, release must allow cleartext.
+        // Revert to "false" once the API moves to HTTPS.
+        manifestPlaceholders["usesCleartextTraffic"] = "true"
         applicationId = "kz.naryad.ai"
         minSdk = 24
         targetSdk = 37

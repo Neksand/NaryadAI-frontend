@@ -35,3 +35,5 @@ src-tauri/gen/android/.gradle/
 coverage/
 test-results/
 playwright-report/
+
+*.idsig

@@ -6,6 +6,7 @@ import { EmptyState, ErrorState, SkeletonList } from './ui';
 export interface ForecastItem {
   equipment_id: string;
   equipment_name: string;
+  risk_index?: number;
   probability: number;
   recent: number;
   growth: number;
@@ -40,26 +41,29 @@ export function ForecastPanel({ limit = 5 }: { limit?: number }) {
         <EmptyState text={t('common.empty')} />
       ) : (
         <ul className="flex flex-col gap-2">
-          {query.data.map((item) => (
-            <li
-              key={item.equipment_id}
-              className="flex items-center justify-between gap-2 flex-wrap"
-            >
-              <div className="flex flex-col">
-                <span className="font-semibold">{item.equipment_name}</span>
-                <span className="text-sm text-[var(--ink-muted)]">
-                  {t('analytics.forecastRecent')}: {item.recent} · {t('analytics.forecastGrowth')}:{' '}
-                  {Math.round(item.growth * 100)}%
-                </span>
-              </div>
-              <span
-                className="num font-bold"
-                aria-label={`${t('analytics.forecastProbability')}: ${Math.round(item.probability * 100)} / 100`}
+          {query.data.map((item) => {
+            const risk = item.risk_index ?? item.probability;
+            return (
+              <li
+                key={item.equipment_id}
+                className="flex items-center justify-between gap-2 flex-wrap"
               >
-                {t('analytics.forecastProbability')}: {Math.round(item.probability * 100)} / 100
-              </span>
-            </li>
-          ))}
+                <div className="flex flex-col">
+                  <span className="font-semibold">{item.equipment_name}</span>
+                  <span className="text-sm text-[var(--ink-muted)]">
+                    {t('analytics.forecastRecent')}: {item.recent} · {t('analytics.forecastGrowth')}
+                    : {Math.round(item.growth * 100)}%
+                  </span>
+                </div>
+                <span
+                  className="num font-bold"
+                  aria-label={`${t('analytics.forecastProbability')}: ${Math.round(risk * 100)} / 100`}
+                >
+                  {t('analytics.forecastProbability')}: {Math.round(risk * 100)} / 100
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
