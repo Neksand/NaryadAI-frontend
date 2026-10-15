@@ -67,6 +67,20 @@ it('gets private signed URLs and shows distinct before and after photos', async 
   expect(urlMock).toHaveBeenCalledWith('before-1');
 });
 
+it('opens tapped photo in the lightbox and closes it', async () => {
+  const u = userEvent.setup();
+  urlMock.mockResolvedValue('http://storage.test/after-1');
+  renderWithProviders(<OrderPhotos photos={[{ id: 'after-1', kind: 'after' }]} />);
+  await u.click(await screen.findByRole('button', { name: 'Открыть фото' }));
+  expect(screen.getByRole('dialog')).toBeTruthy();
+  expect(screen.getByTestId('lightbox-image')).toHaveAttribute(
+    'src',
+    'http://storage.test/after-1',
+  );
+  await u.click(screen.getByRole('button', { name: 'Закрыть' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+});
+
 it('allows a failed private photo URL to be retried', async () => {
   const u = userEvent.setup();
   urlMock

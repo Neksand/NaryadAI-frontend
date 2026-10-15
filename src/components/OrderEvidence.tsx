@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { photoUrl } from '../api/photos';
 import { AIReviewSchema } from '../types/domain';
 import { AITag } from './ui';
+import { Lightbox, type LightboxItem } from './Lightbox';
 
 interface ReviewEvidence {
   verdict?: string;
@@ -62,6 +64,7 @@ export function OrderAssessment({ review }: { review: unknown }) {
 
 export function OrderPhotos({ photos }: { photos: unknown }) {
   const { t } = useTranslation();
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
   const items = Array.isArray(photos)
     ? (photos as { id: string; kind?: string }[]).filter((photo) => !!photo?.id)
     : [];
@@ -73,6 +76,16 @@ export function OrderPhotos({ photos }: { photos: unknown }) {
     })),
   });
   if (!items.length) return null;
+  const loaded: LightboxItem[] = items.flatMap((photo, index) => {
+    const url = urls[index]?.data;
+    if (typeof url !== 'string' || !url) return [];
+    return [
+      {
+        src: url,
+        alt: t(photo.kind === 'before' ? 'master.beforePhoto' : 'worker.afterPhotos'),
+      },
+    ];
+  });
   return (
     <section className="card flex flex-col gap-3" aria-label={t('worker.photoEvidence')}>
       <h3 className="font-bold">{t('worker.photoEvidence')}</h3>
@@ -90,17 +103,38 @@ export function OrderPhotos({ photos }: { photos: unknown }) {
                 {t('common.retry')}
               </button>
             ) : (
-              <a href={urls[index].data} target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                className="block w-full !p-0 !border-0 !bg-transparent"
+                onClick={() => {
+                  const at = loaded.findIndex(
+                    (l) =>
+                      l.src === urls[index].data &&
+                      l.alt ===
+                        t(photo.kind === 'before' ? 'master.beforePhoto' : 'worker.afterPhotos'),
+                  );
+                  setOpenIndex(at >= 0 ? at : 0);
+                }}
+                aria-label={t('lightbox.open', 'Открыть фото')}
+              >
                 <img
                   src={urls[index].data}
                   alt={t(photo.kind === 'before' ? 'master.beforePhoto' : 'worker.afterPhotos')}
                   className="w-full max-h-72 object-contain rounded"
                 />
-              </a>
+              </button>
             )}
           </figure>
         ))}
       </div>
+      {openIndex !== null && loaded.length > 0 && (
+        <Lightbox
+          items={loaded}
+          index={Math.min(openIndex, loaded.length - 1)}
+          onClose={() => setOpenIndex(null)}
+          onIndex={setOpenIndex}
+        />
+      )}
     </section>
   );
 }

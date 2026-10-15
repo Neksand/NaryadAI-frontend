@@ -10,6 +10,7 @@ import { Shell, roleTabs } from '../components/Shell';
 import { VoiceButton } from '../components/VoiceButton';
 import { DateTimeField } from '../components/DateTimeField';
 import { AITag, ErrorState } from '../components/ui';
+import { Lightbox, type LightboxItem } from '../components/Lightbox';
 import { toLocalizedError, newUUID } from '../lib/api-client';
 import { pickName } from '../lib/names';
 import { Icon } from '../components/Icon';
@@ -59,6 +60,7 @@ export default function MasterNew() {
   const [pendingLocalPhotos, setPendingLocalPhotos] = useState<PendingPhotoRef[]>([]);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [draftQueued, setDraftQueued] = useState(false);
   const offline = useOfflineQueue();
   const draftUserId = useAuthStore((s) => s.user?.id ?? 'anonymous');
@@ -613,11 +615,18 @@ export default function MasterNew() {
                   data-testid={`photo-preview-${photoId}`}
                 >
                   {previewUrls[photoId] ? (
-                    <img
-                      src={previewUrls[photoId]}
-                      alt={t('master.beforePhoto')}
-                      className="w-full max-h-40 object-contain rounded"
-                    />
+                    <button
+                      type="button"
+                      className="block w-full !p-0 !border-0 !bg-transparent"
+                      onClick={() => setLightboxKey(photoId)}
+                      aria-label={t('lightbox.open', 'Открыть фото')}
+                    >
+                      <img
+                        src={previewUrls[photoId]}
+                        alt={t('master.beforePhoto')}
+                        className="w-full max-h-40 object-contain rounded"
+                      />
+                    </button>
                   ) : (
                     <div className="text-sm mono break-all">{photoId}</div>
                   )}
@@ -639,11 +648,18 @@ export default function MasterNew() {
                   data-testid={`photo-preview-${p.localId}`}
                 >
                   {previewUrls[p.localId] ? (
-                    <img
-                      src={previewUrls[p.localId]}
-                      alt={t('master.beforePhoto')}
-                      className="w-full max-h-40 object-contain rounded"
-                    />
+                    <button
+                      type="button"
+                      className="block w-full !p-0 !border-0 !bg-transparent"
+                      onClick={() => setLightboxKey(p.localId)}
+                      aria-label={t('lightbox.open', 'Открыть фото')}
+                    >
+                      <img
+                        src={previewUrls[p.localId]}
+                        alt={t('master.beforePhoto')}
+                        className="w-full max-h-40 object-contain rounded"
+                      />
+                    </button>
                   ) : (
                     <div className="text-sm mono break-all">
                       {t('common.queued')}: {p.localId.slice(0, 8)}
@@ -662,6 +678,27 @@ export default function MasterNew() {
               ))}
             </div>
           )}
+          {(() => {
+            const keys = [
+              ...photoIds.filter((id) => previewUrls[id]),
+              ...pendingLocalPhotos.map((p) => p.localId).filter((id) => previewUrls[id]),
+            ];
+            const items: LightboxItem[] = keys.map((key) => ({
+              src: previewUrls[key],
+              alt: t('master.beforePhoto'),
+            }));
+            const at = lightboxKey ? keys.indexOf(lightboxKey) : -1;
+            return (
+              at >= 0 && (
+                <Lightbox
+                  items={items}
+                  index={at}
+                  onClose={() => setLightboxKey(null)}
+                  onIndex={(i) => setLightboxKey(keys[i] ?? null)}
+                />
+              )
+            );
+          })()}
           {pendingLocalPhotos.length > 0 && (
             <span role="status" className="text-sm opacity-70">
               {t('common.offline')} · {t('common.queued')}: {pendingLocalPhotos.length}

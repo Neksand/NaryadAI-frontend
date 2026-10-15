@@ -10,8 +10,10 @@ import {
   describePhotoFailure,
   ensureFileReadable,
   listOrderPhotos,
+  photoUrl,
   type PhotoKind,
 } from '../api/photos';
+import { Lightbox, type LightboxItem } from '../components/Lightbox';
 import { suggestFaultCode } from '../api/ai';
 import { Shell, roleTabs } from '../components/Shell';
 import { VoiceButton } from '../components/VoiceButton';
@@ -112,6 +114,8 @@ export default function WorkerOrder() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   // Последний неуспешный файл для кнопки «Повторить» (повтор без перевыбора).
   const [failedPhoto, setFailedPhoto] = useState<{ file: File; kind: PhotoKind } | null>(null);
+  const [lightbox, setLightbox] = useState<{ items: LightboxItem[]; index: number } | null>(null);
+  const [lightboxLoading, setLightboxLoading] = useState(false);
   // Offline-first after-photos: blobs live in per-employee IndexedDB until replay.
   const [pendingOfflinePhotos, setPendingOfflinePhotos] = useState<PendingPhotoRef[]>([]);
   const [offlinePreviewUrls, setOfflinePreviewUrls] = useState<Record<string, string>>({});
@@ -296,6 +300,29 @@ export default function WorkerOrder() {
   const handleRetryPhoto = () => {
     if (!failedPhoto || uploadingAfter) return;
     void onPhoto(failedPhoto.file, failedPhoto.kind);
+  };
+
+  const openServerPhoto = async (photoId: string) => {
+    if (lightboxLoading) return;
+    setLightboxLoading(true);
+    try {
+      const url = await photoUrl(photoId);
+      setLightbox({ items: [{ src: url, alt: t('worker.afterPhotos') }], index: 0 });
+    } catch (e) {
+      setPhotoError(toLocalizedError(e).message);
+    } finally {
+      setLightboxLoading(false);
+    }
+  };
+
+  const openOfflinePhoto = (localId: string) => {
+    const keys = pendingOfflinePhotos.map((p) => p.localId).filter((id) => offlinePreviewUrls[id]);
+    const at = keys.indexOf(localId);
+    if (at < 0) return;
+    setLightbox({
+      items: keys.map((id) => ({ src: offlinePreviewUrls[id], alt: t('worker.afterPhotos') })),
+      index: at,
+    });
   };
 
   // Возврат из камеры/сна: автоматически повторяем неуспешное фото.
@@ -718,7 +745,14 @@ export default function WorkerOrder() {
                       className="relative card !p-2"
                       data-testid={`photo-preview-${p.id}`}
                     >
-                      <div className="text-sm mono break-all">{p.id.slice(0, 8)}</div>
+                      <button
+                        type="button"
+                        className="block w-full !p-0 !border-0 !bg-transparent mono text-sm text-left"
+                        onClick={() => void openServerPhoto(p.id)}
+                        aria-label={t('lightbox.open', 'Открыть фото')}
+                      >
+                        <span className="text-sm mono break-all">{p.id.slice(0, 8)} ⤢</span>
+                      </button>
                       <button
                         type="button"
                         className="btn btn-sm btn-danger-o absolute top-1 right-1"
@@ -741,11 +775,18 @@ export default function WorkerOrder() {
                       data-testid={`photo-preview-${p.localId}`}
                     >
                       {offlinePreviewUrls[p.localId] ? (
-                        <img
-                          src={offlinePreviewUrls[p.localId]}
-                          alt={t('worker.afterPhotos')}
-                          className="w-full max-h-40 object-contain rounded"
-                        />
+                        <button
+                          type="button"
+                          className="block w-full !p-0 !border-0 !bg-transparent"
+                          onClick={() => openOfflinePhoto(p.localId)}
+                          aria-label={t('lightbox.open', 'Открыть фото')}
+                        >
+                          <img
+                            src={offlinePreviewUrls[p.localId]}
+                            alt={t('worker.afterPhotos')}
+                            className="w-full max-h-40 object-contain rounded"
+                          />
+                        </button>
                       ) : (
                         <div className="text-sm mono break-all">
                           {t('common.queued')}: {p.localId.slice(0, 8)}
@@ -778,6 +819,15 @@ export default function WorkerOrder() {
                     </button>
                   )}
                 </div>
+              )}
+              {lightboxLoading && <span role="status">{t('common.loading')}</span>}
+              {lightbox && (
+                <Lightbox
+                  items={lightbox.items}
+                  index={lightbox.index}
+                  onClose={() => setLightbox(null)}
+                  onIndex={(i) => setLightbox({ items: lightbox.items, index: i })}
+                />
               )}
             </div>
             {o.kind === 'unplanned' &&
