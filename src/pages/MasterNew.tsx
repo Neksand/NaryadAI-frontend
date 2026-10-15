@@ -13,6 +13,9 @@ import { AITag, ErrorState } from '../components/ui';
 import { toLocalizedError, newUUID } from '../lib/api-client';
 import { pickName } from '../lib/names';
 import { Icon } from '../components/Icon';
+import { useOfflineQueue } from '../hooks/useOfflineQueue';
+import { saveOfflinePhoto, type PendingPhotoRef } from '../lib/offline-photos';
+import { useAuthStore } from '../store/auth-store';
 
 export default function MasterNew() {
   const { t, i18n } = useTranslation();
@@ -34,6 +37,11 @@ export default function MasterNew() {
   const [photoIds, setPhotoIds] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Offline draft photos: blobs in per-employee IndexedDB, uploaded before create.
+  const [pendingLocalPhotos, setPendingLocalPhotos] = useState<PendingPhotoRef[]>([]);
+  const [draftQueued, setDraftQueued] = useState(false);
+  const offline = useOfflineQueue();
+  const draftUserId = useAuthStore((s) => s.user?.id ?? 'anonymous');
 
   const areas = useQuery({ queryKey: ['catalog', 'sites'], queryFn: () => catalogList('sites') });
   const equipment = useQuery({
@@ -70,27 +78,65 @@ export default function MasterNew() {
   });
 
   const create = useMutation({
-    mutationFn: () =>
-      createWorkOrder(
-        {
-          // area_id бэкенд не принимает (участок выводится из оборудования) — только обязательные поля CreateWO.
-          // due_at уже ISO из DateTimeField (дд.мм.гггг, чч:мм), повторно не парсим.
-          kind: form.kind,
-          description: form.description.trim(),
-          equipment_id: form.equipment_id,
-          assignee_id: form.assignee_id || undefined,
-          crew_id: form.crew_id || undefined,
-          priority: form.priority,
-          due_at: form.due_at,
-          norm_minutes: form.norm_minutes,
-          equipment_stopped: form.equipment_stopped,
-          photo_ids: photoIds,
-          comment: form.comment.trim() || undefined,
-        },
-        newUUID(),
-      ),
-    onSuccess: (order) => nav(`/master/orders/${order.id}`),
+    networkMode: 'always',
+    mutationFn: async () => {
+      const payload = {
+        // area_id бэкенд не принимает (участок выводится из оборудования) — только обязательные поля CreateWO.
+        // due_at уже ISO из DateTimeField (дд.мм.гггг, чч:мм), повторно не парсим.
+        kind: form.kind,
+        description: form.description.trim(),
+        equipment_id: form.equipment_id,
+        assignee_id: form.assignee_id || undefined,
+        crew_id: form.crew_id || undefined,
+        priority: form.priority,
+        due_at: form.due_at,
+        norm_minutes: form.norm_minutes,
+        equipment_stopped: form.equipment_stopped,
+        photo_ids: photoIds,
+        comment: form.comment.trim() || undefined,
+      };
+      const isOffline =
+        !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
+      // Offline draft with photos: persist blobs per-employee, enqueue one
+      // idempotent create; replay uploads photos first (upload-then-act).
+      if (isOffline && pendingLocalPhotos.length > 0) {
+        const key = newUUID();
+        await offline.enqueue({
+          key,
+          orderId: 'new',
+          action: 'create',
+          opType: 'create',
+          body: payload,
+          pendingPhotos: pendingLocalPhotos.map((p) => ({ localId: p.localId, kind: p.kind })),
+          clientAt: new Date().toISOString(),
+        });
+        setPendingLocalPhotos([]);
+        return { queued: true as const };
+      }
+      if (isOffline) {
+        const key = newUUID();
+        await offline.enqueue({
+          key,
+          orderId: 'new',
+          action: 'create',
+          opType: 'create',
+          body: payload,
+          clientAt: new Date().toISOString(),
+        });
+        return { queued: true as const };
+      }
+      return createWorkOrder(payload, newUUID());
+    },
+    onSuccess: (order) => {
+      if ((order as { queued?: boolean } | undefined)?.queued) {
+        setDraftQueued(true);
+        return;
+      }
+      nav(`/master/orders/${(order as { id: string }).id}`);
+    },
   });
+
+  const totalPhotos = photoIds.length + pendingLocalPhotos.length;
 
   const canSubmit =
     form.equipment_id &&
@@ -374,10 +420,28 @@ export default function MasterNew() {
               type="file"
               className="hidden"
               accept="image/jpeg,image/png,image/webp"
-              disabled={uploadingPhoto || photoIds.length >= 5}
+              disabled={uploadingPhoto || totalPhotos >= 5}
               onChange={async (e) => {
                 const f = e.target.files?.[0];
-                if (!f || uploadingPhoto || photoIds.length >= 5) return;
+                if (!f || uploadingPhoto || totalPhotos >= 5) return;
+                const offlineNow =
+                  !offline.online ||
+                  (typeof navigator !== 'undefined' && navigator.onLine === false);
+                if (offlineNow) {
+                  try {
+                    setUploadingPhoto(true);
+                    setPhotoError(null);
+                    const rec = await saveOfflinePhoto(draftUserId, f, 'before', f.name);
+                    setPendingLocalPhotos((p) =>
+                      p.length >= 5 ? p : [...p, { localId: rec.localId, kind: rec.kind }],
+                    );
+                  } catch (err) {
+                    setPhotoError(toLocalizedError(err).message);
+                  } finally {
+                    setUploadingPhoto(false);
+                  }
+                  return;
+                }
                 try {
                   setUploadingPhoto(true);
                   setPhotoError(null);
@@ -392,9 +456,14 @@ export default function MasterNew() {
             />
           </label>
           {uploadingPhoto && <span role="status">{t('common.loading')}</span>}
-          {photoIds.length > 0 && (
+          {totalPhotos > 0 && (
             <span className="chip ok">
-              <Icon name="check" size={14} /> {photoIds.length}
+              <Icon name="check" size={14} /> {totalPhotos}
+            </span>
+          )}
+          {pendingLocalPhotos.length > 0 && (
+            <span role="status" className="text-sm opacity-70">
+              {t('common.offline')} · {t('common.queued')}: {pendingLocalPhotos.length}
             </span>
           )}
           {photoError && (
@@ -403,6 +472,11 @@ export default function MasterNew() {
             </div>
           )}
         </div>
+        {draftQueued && (
+          <div className="banner banner-warn" role="status">
+            {t('common.offline')} · {t('common.queued')}
+          </div>
+        )}
         {err && <ErrorState message={err.message} />}
         <button
           className="btn btn-primary btn-xl btn-block"

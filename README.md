@@ -1,5 +1,7 @@
 # НарядAI — умные производственные наряды
 
+**Доказательства:** [EVIDENCE](../../NaryadAI-FastAPI-Backend/docs/EVIDENCE.md) · [TEST_REPORT](../../NaryadAI-FastAPI-Backend/TEST_REPORT.md) · [IMPLEMENTATION_REPORT](../../NaryadAI-FastAPI-Backend/IMPLEMENTATION_REPORT.md)
+
 Проверенный срез 14.10.2026: [тесты и ограничения](../NaryadAI-FastAPI-Backend/TEST_REPORT.md), [запуск](../NaryadAI-FastAPI-Backend/DEPLOYMENT.md), [демо](../NaryadAI-FastAPI-Backend/DEMO_SCRIPT.md). Исторические отчёты в docs не являются доказательством текущих метрик.
 
 НарядAI убирает бумажные наряды из цеха. Мастер выдаёт работу с телефона, исполнитель ведёт её по статусам с фото, искусственный интеллект проверяет результат, а руководитель видит живую картину смены и находит больные места в аналитике. Всё это — одно приложение на русском и казахском, которое ставится на телефон как обычное мобильное приложение.
@@ -84,3 +86,7 @@ SKIPPED не означает PASS.
 Очередь офлайн-действий и снимки данных изолированы по сотруднику. Старые очереди
 без идентификатора владельца автоматически не отправляются: перед обновлением
 закончите их синхронизацию в старой версии под исходной учётной записью.
+
+## Артефакты доказательств
+
+[EVIDENCE](../../NaryadAI-FastAPI-Backend/docs/EVIDENCE.md) · [TEST_REPORT](../../NaryadAI-FastAPI-Backend/TEST_REPORT.md) · [IMPLEMENTATION_REPORT](../../NaryadAI-FastAPI-Backend/IMPLEMENTATION_REPORT.md)

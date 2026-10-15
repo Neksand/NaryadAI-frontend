@@ -169,4 +169,35 @@ describe('MasterOrder', () => {
     await u.click(screen.getByRole('button', { name: 'Отменить' }));
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
   });
+
+  it('shows the backend current version and refreshes after a version conflict', async () => {
+    const u = userEvent.setup();
+    woMocks.transitionOrder.mockRejectedValueOnce(
+      Object.assign(new Error('version conflict'), {
+        isAxiosError: true,
+        response: {
+          status: 409,
+          data: {
+            error: {
+              code: 'version_conflict',
+              message: 'Наряд изменён',
+              translation_key: 'error.version_conflict',
+              details: { current_version: 3 },
+            },
+            request_id: 'r1',
+          },
+        },
+      }),
+    );
+    renderOrder(['cancel']);
+    await waitFor(() => expect(screen.getByText('Готово к приёмке')).toBeTruthy());
+    await u.click(screen.getByRole('button', { name: 'Отменить' }));
+
+    expect(
+      await screen.findByText('Данные изменились (версия 3). Обновите и повторите.'),
+    ).toBeTruthy();
+    await u.click(screen.getByRole('button', { name: 'Обновить и повторить' }));
+    await waitFor(() => expect(woMocks.getWorkOrder).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/Данные изменились/)).toBeNull();
+  });
 });

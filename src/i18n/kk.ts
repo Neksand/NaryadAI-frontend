@@ -29,6 +29,10 @@ export default {
     demoHint: 'Жергілікті сервердегі тесттік тіркелгілермен жылдам кіру.',
   },
   role: { worker: 'Орындаушы', master: 'Шебер', manager: 'Басшы', admin: 'Әкімші' },
+  version: {
+    conflict: 'Деректер өзгерді (нұсқа {{currentVersion}}). Жаңартып, қайталап көріңіз.',
+    conflictRefresh: 'Жаңарту және қайталау',
+  },
   empStatus: { free: 'Бос', busy: 'Бос емес', queue: 'Кезекте', off: 'Ауысымда жоқ' },
   common: {
     retry: 'Қайталау',
@@ -236,6 +240,14 @@ export default {
       'Жөндеу тарихына негізделген 0–100 эвристикалық шкала. Бұл ақау ықтималдығы емес, тексеру басымдығы.',
     forecastRecent: '30 күндегі жоспардан тыс',
     forecastGrowth: 'Өсім',
+    evidence: 'Дәлелдер',
+    insightCount: 'Саны',
+    insightDenominator: 'Бөлімі',
+    insightFormula: 'Формула',
+    insightOrders: 'Бастапқы нарядтар',
+    insightNoOrders: 'Бастапқы нарядтар тіркелмеген',
+    insightNoCause:
+      'Корреляция себепті дәлелдемейді. Шешім қабылдамас бұрын бастапқы нарядтарды тексеріңіз.',
   },
   reports: {
     title: 'Есепті экспорттау',
@@ -458,5 +470,22 @@ export default {
     WORKER_STATUS_CHANGED: 'Қызметкер мәртебесі',
     NOTIFICATION_CREATED: 'Хабарлама',
     readAll: 'Барлығын оқылды',
+  },
+  economics: {
+    whatifTitle: 'Егер … болса: экономика',
+    whatifDesc: 'Жүгірткілерді жылжытыңыз — NPV мен ROI серверге сұраусыз бірден қайта есептеледі.',
+    whatifPrice: 'Тоқтап қалу сағатының бағасы, ₸',
+    whatifNorm: 'Материал нормалары, %',
+    whatifHorizon: 'Көкжиек, ай',
+    whatifBenefit: 'Айлық пайда',
+    whatifNet: 'Айлық таза әсер',
+    whatifNpv: 'Көкжиек NPV-і',
+    whatifRoi: 'Көкжиек ROI-і',
+    whatifAssumptions: 'Болжамдар',
+    whatifAssumptionPrevent: 'Тоқтаулардың 20%-ын болдырмаймыз — болжам, болжау емес.',
+    whatifAssumptionRate: 'Дисконттау мөлшерлемесі жылдық 12% (айына 1%).',
+    whatifAssumptionPrice: 'Бэкендте сағат бағасы жоқ — жүгірткі мәні қолданылады.',
+    whatifAssumptionRoi: 'ROI = таза әсер / көкжиектегі материалдардың базалық шығыны.',
+    whatifUnknown: 'белгісіз',
   },
 };

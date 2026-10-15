@@ -24,6 +24,8 @@ import {
 import { planOrderFromInsight } from '../api/ai';
 import { Shell, roleTabs } from '../components/Shell';
 import { ForecastPanel } from '../components/ForecastPanel';
+import { EconomicsWhatIf } from '../components/EconomicsWhatIf';
+import { InsightEvidence } from '../components/OrderEvidence';
 import { AITag, ErrorState, SkeletonList } from '../components/ui';
 import { toLocalizedError, newUUID } from '../lib/api-client';
 import { pickName } from '../lib/names';
@@ -39,6 +41,11 @@ interface Insight {
   explanation?: string;
   recommendation?: string;
   recommendation_kk?: string;
+  order_ids?: unknown;
+  evidence?: unknown;
+  denominator?: unknown;
+  formula?: unknown;
+  count?: unknown;
 }
 
 /** Карточка инсайта: выбор исполнителя + создание планового наряда (раньше уходило без assignee → 422 молча). */
@@ -90,6 +97,7 @@ function InsightCard({
             : (ins.explanation ?? ins.recommendation)
         }
       />
+      <InsightEvidence insight={ins} />
       {plan.isSuccess ? (
         <div className="banner banner-ai" role="status">
           <Icon name="check" size={16} /> {t('analytics.plannedOk')}
@@ -431,17 +439,7 @@ export default function ManagerDashboard() {
   const kpis = d.kpis ?? d;
   const insightItems = ((insights.data as { items?: unknown[]; data?: unknown[] })?.items ??
     (insights.data as { data?: unknown[] })?.data ??
-    (Array.isArray(insights.data) ? insights.data : [])) as {
-    id: string;
-    title?: string;
-    headline?: string;
-    headline_kk?: string;
-    severity?: string;
-    confidence?: number;
-    explanation?: string;
-    recommendation?: string;
-    recommendation_kk?: string;
-  }[];
+    (Array.isArray(insights.data) ? insights.data : [])) as Insight[];
   const ratingItems = ((ratings.data as { items?: unknown[]; data?: unknown[] })?.items ??
     (ratings.data as { data?: unknown[] })?.data ??
     []) as {
@@ -478,6 +476,7 @@ export default function ManagerDashboard() {
         <>
           <ReportExportPanel />
           <ForecastPanel limit={5} />
+          <EconomicsWhatIf />
           {dash.isPending ? (
             <SkeletonList rows={2} />
           ) : dash.isError ? (

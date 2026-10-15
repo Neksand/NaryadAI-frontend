@@ -11,8 +11,19 @@ import {
 import { Shell, roleTabs } from '../components/Shell';
 import { displayOrder, useNames } from '../hooks/useNames';
 import { ErrorState, PriorityTag, SkeletonList, StatusChip } from '../components/ui';
+import VersionConflictNotice from '../components/VersionConflictNotice';
 import { toLocalizedError, newUUID } from '../lib/api-client';
 import { Icon } from '../components/Icon';
+
+function currentVersionFromError(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null;
+  const details = (
+    error as {
+      response?: { data?: { error?: { details?: { current_version?: unknown } } } };
+    }
+  ).response?.data?.error?.details;
+  return typeof details?.current_version === 'number' ? details.current_version : null;
+}
 
 /** Master order view: renders backend allowed_actions (close/reassign/cancel/change_priority/…). */
 export default function MasterOrder() {
@@ -37,6 +48,9 @@ export default function MasterOrder() {
       void qc.invalidateQueries({ queryKey: ['orders'] });
     },
   });
+  const actError = act.isError ? toLocalizedError(act.error) : null;
+  const conflictVersion =
+    actError?.code === 'version_conflict' ? currentVersionFromError(act.error) : null;
 
   if (order.isPending)
     return (
@@ -141,7 +155,17 @@ export default function MasterOrder() {
           </div>
         )}
       </div>
-      {act.isError && <ErrorState message={toLocalizedError(act.error).message} />}
+      {act.isError && conflictVersion !== null ? (
+        <VersionConflictNotice
+          currentVersion={conflictVersion}
+          onRefresh={async () => {
+            act.reset();
+            await Promise.all([order.refetch(), qc.invalidateQueries({ queryKey: ['orders'] })]);
+          }}
+        />
+      ) : act.isError ? (
+        <ErrorState message={toLocalizedError(act.error).message} />
+      ) : null}
     </Shell>
   );
 }

@@ -21,6 +21,8 @@ import { toLocalizedError, newUUID } from '../lib/api-client';
 import { formatDT } from '../lib/dates';
 import { pickName } from '../lib/names';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
+import { saveOfflinePhoto, type PendingPhotoRef } from '../lib/offline-photos';
+import { useAuthStore } from '../store/auth-store';
 import { Icon } from '../components/Icon';
 import { OfflineQueuePanel } from '../components/OfflineQueuePanel';
 import { OrderAssessment, OrderPhotos } from '../components/OrderEvidence';
@@ -81,6 +83,9 @@ export default function WorkerOrder() {
   const [afterPct, setAfterPct] = useState<number | null>(null);
   const [afterDone, setAfterDone] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  // Offline-first after-photos: blobs live in per-employee IndexedDB until replay.
+  const [pendingOfflinePhotos, setPendingOfflinePhotos] = useState<PendingPhotoRef[]>([]);
+  const photoUserId = useAuthStore((s) => s.user?.id ?? 'anonymous');
 
   const needsReason = pendingAction === 'reject' || pendingAction === 'pause';
   const completing = pendingAction === 'complete';
@@ -132,20 +137,30 @@ export default function WorkerOrder() {
       // Offline: queue worker mutations with a stable Idempotency-Key, send when back online.
       const isOffline =
         !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
-      if (
-        isOffline &&
-        ['accept', 'queue', 'start', 'pause', 'resume', 'complete'].includes(vars.action)
-      ) {
+      const offlinePhotos =
+        vars.action === 'complete' && pendingOfflinePhotos.length > 0
+          ? pendingOfflinePhotos.map((p) => ({ localId: p.localId, kind: p.kind }))
+          : [];
+      // A complete with locally stored photos must go through the queue even when
+      // back online: replay uploads blobs first (upload-then-act) with the same key.
+      const mustQueue =
+        (isOffline &&
+          ['accept', 'queue', 'start', 'pause', 'resume', 'complete'].includes(vars.action)) ||
+        offlinePhotos.length > 0;
+      if (mustQueue) {
         const key = newUUID();
-        return offline
-          .enqueue({
-            key,
-            orderId: id,
-            action: vars.action,
-            body: vars.body ?? {},
-            clientAt: new Date().toISOString(),
-          })
-          .then(() => ({ queued: true as const }));
+        const promise = offline.enqueue({
+          key,
+          orderId: id,
+          action: vars.action,
+          body: vars.body ?? {},
+          clientAt: new Date().toISOString(),
+          ...(offlinePhotos.length > 0 ? { pendingPhotos: offlinePhotos } : {}),
+        });
+        return promise.then(() => {
+          if (offlinePhotos.length > 0) setPendingOfflinePhotos([]);
+          return { queued: true as const };
+        });
       }
       return transitionOrder(id, vars.action, vars.body ?? {}, newUUID());
     },
@@ -169,6 +184,23 @@ export default function WorkerOrder() {
   };
 
   const onPhoto = async (file: File, kind: PhotoKind) => {
+    const isOffline =
+      !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (isOffline) {
+      // No network: keep the blob in per-employee IndexedDB; replay uploads it
+      // before the complete action (upload-then-act) and survives reload.
+      try {
+        setPhotoError(null);
+        const rec = await saveOfflinePhoto(photoUserId, file, kind, file.name);
+        setPendingOfflinePhotos((p) =>
+          p.length >= 5 ? p : [...p, { localId: rec.localId, kind: rec.kind }],
+        );
+        if (kind === 'after') setAfterDone(true);
+      } catch (e) {
+        setPhotoError(toLocalizedError(e).message);
+      }
+      return;
+    }
     try {
       setPhotoError(null);
       setAfterPct(0);
@@ -517,6 +549,11 @@ export default function WorkerOrder() {
                   {t('worker.afterPhotos')}: {Math.round(afterPct)}%
                 </div>
               )}
+              {pendingOfflinePhotos.length > 0 && (
+                <div className="mono text-sm text-[var(--ink-muted)]" role="status">
+                  {t('common.queued')}: {pendingOfflinePhotos.length}
+                </div>
+              )}
               {photoError && (
                 <div className="banner banner-danger" role="alert">
                   {photoError}
@@ -525,6 +562,7 @@ export default function WorkerOrder() {
             </div>
             {o.kind === 'unplanned' &&
               !afterDone &&
+              pendingOfflinePhotos.length === 0 &&
               !((orderPhotos.data ?? []) as { kind?: string }[]).some(
                 (p) => p.kind === 'after',
               ) && (

@@ -251,6 +251,10 @@ test('case: master issues, worker accepts and completes with materials, master r
         'Automated form actions: one click, selectOption, fill or setInputFiles = one action. Login/navigation, keyboard keystrokes and native file-picker taps excluded. Not a human six-tap/time study.',
     };
     await writeFile(testInfo.outputPath('case-metrics.json'), JSON.stringify(metrics, null, 2));
+    await writeFile(
+      new URL('../docs/evidence/creation-metrics.json', import.meta.url),
+      JSON.stringify({ actions: creationActions, automatedCreationMs }, null, 2),
+    );
     console.info('Case metrics:', JSON.stringify(metrics));
     await master.screenshot({ path: testInfo.outputPath('master-decision.png'), fullPage: true });
     await testInfo.attach('case-metrics', {

@@ -1,0 +1,37 @@
+{
+  "actions": [
+    {
+      "type": "click",
+      "field": "kind"
+    },
+    {
+      "type": "select",
+      "field": "area"
+    },
+    {
+      "type": "select",
+      "field": "equipment"
+    },
+    {
+      "type": "fill",
+      "field": "due_at"
+    },
+    {
+      "type": "fill",
+      "field": "description"
+    },
+    {
+      "type": "select",
+      "field": "assignee"
+    },
+    {
+      "type": "fileUpload",
+      "field": "before_photo"
+    },
+    {
+      "type": "click",
+      "field": "submit"
+    }
+  ],
+  "automatedCreationMs": 1125
+}
