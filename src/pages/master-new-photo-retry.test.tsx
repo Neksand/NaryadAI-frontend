@@ -18,35 +18,61 @@ const miscMock = vi.hoisted(() => vi.fn(async () => []));
 const stagedRecords = vi.hoisted(() => new Map<string, any>());
 const draftRefs = vi.hoisted(() => new Map<string, any[]>());
 const photoMocks = vi.hoisted(() => ({
-  ensureFileReadable: async (file: File) => { await file.arrayBuffer(); },
+  ensureFileReadable: async (file: File) => {
+    await file.arrayBuffer();
+  },
   uploadPhoto: vi.fn(async () => ({ id: 'ph1' })),
   deletePhoto: vi.fn(async () => {}),
   describePhotoFailure: (_f: unknown, _t: unknown, _e: unknown) => 'diag',
   photoSourceLabel: (source?: string) => `source: ${source ?? 'unknown'}`,
 }));
 const offlinePhotoMocks = vi.hoisted(() => ({
-  saveOfflinePhoto: vi.fn(async (_userId: string, file: File, kind: 'before' | 'after', name?: string, source?: string) => {
-    const localId = 'loc1';
-    const rec = { localId, kind, name: name ?? file.name, type: file.type, source, data: new Blob([await file.arrayBuffer()], { type: file.type }) };
-    stagedRecords.set(localId, rec);
-    return rec;
-  }),
+  saveOfflinePhoto: vi.fn(
+    async (
+      _userId: string,
+      file: File,
+      kind: 'before' | 'after',
+      name?: string,
+      source?: string,
+    ) => {
+      const localId = 'loc1';
+      const rec = {
+        localId,
+        kind,
+        name: name ?? file.name,
+        type: file.type,
+        source,
+        data: new Blob([await file.arrayBuffer()], { type: file.type }),
+      };
+      stagedRecords.set(localId, rec);
+      return rec;
+    },
+  ),
   getOfflinePhoto: vi.fn(async (_userId: string, localId: string) => stagedRecords.get(localId)),
   readStagedFile: vi.fn(async (_userId: string, localId: string) => {
     const record = stagedRecords.get(localId);
-    return record ? { record, file: new File([record.data], record.name, { type: record.type }) } : null;
+    return record
+      ? { record, file: new File([record.data], record.name, { type: record.type }) }
+      : null;
   }),
   addOfflinePhotoDraftRef: vi.fn(async (userId: string, key: string, ref: any) => {
     const draftKey = `${userId}:${key}`;
     const refs = draftRefs.get(draftKey) ?? [];
     if (!refs.some((item) => item.localId === ref.localId)) draftRefs.set(draftKey, [...refs, ref]);
   }),
-  listOfflinePhotoDraftRefs: vi.fn(async (userId: string, key: string) => draftRefs.get(`${userId}:${key}`) ?? []),
+  listOfflinePhotoDraftRefs: vi.fn(
+    async (userId: string, key: string) => draftRefs.get(`${userId}:${key}`) ?? [],
+  ),
   removeOfflinePhotoDraftRefs: vi.fn(async (userId: string, key: string, localIds: string[]) => {
     const draftKey = `${userId}:${key}`;
-    draftRefs.set(draftKey, (draftRefs.get(draftKey) ?? []).filter((ref) => !localIds.includes(ref.localId)));
+    draftRefs.set(
+      draftKey,
+      (draftRefs.get(draftKey) ?? []).filter((ref) => !localIds.includes(ref.localId)),
+    );
   }),
-  removeOfflinePhotos: vi.fn(async (_userId: string, localIds: string[]) => { localIds.forEach((localId) => stagedRecords.delete(localId)); }),
+  removeOfflinePhotos: vi.fn(async (_userId: string, localIds: string[]) => {
+    localIds.forEach((localId) => stagedRecords.delete(localId));
+  }),
 }));
 const queueMocks = vi.hoisted(() => ({
   online: true,
@@ -104,11 +130,20 @@ beforeEach(() => {
   queueMocks.online = true;
   photoMocks.uploadPhoto.mockResolvedValue({ id: 'ph1' });
   photoMocks.deletePhoto.mockResolvedValue(undefined);
-  offlinePhotoMocks.saveOfflinePhoto.mockImplementation(async (_u: string, file: File, kind: 'before' | 'after', name?: string, source?: string) => {
-    const rec = { localId: 'loc1', kind, name: name ?? file.name, type: file.type, source, data: new Blob([await file.arrayBuffer()], { type: file.type }) };
-    stagedRecords.set('loc1', rec);
-    return rec;
-  });
+  offlinePhotoMocks.saveOfflinePhoto.mockImplementation(
+    async (_u: string, file: File, kind: 'before' | 'after', name?: string, source?: string) => {
+      const rec = {
+        localId: 'loc1',
+        kind,
+        name: name ?? file.name,
+        type: file.type,
+        source,
+        data: new Blob([await file.arrayBuffer()], { type: file.type }),
+      };
+      stagedRecords.set('loc1', rec);
+      return rec;
+    },
+  );
   offlinePhotoMocks.removeOfflinePhotos.mockResolvedValue(undefined);
   miscMock.mockImplementation(async (name: string) => {
     if (name === 'sites') return areas;
@@ -116,7 +151,11 @@ beforeEach(() => {
     if (name === 'teams') return [];
     return [];
   });
-  apiGetMock.mockResolvedValue({ data: workers });
+  apiGetMock.mockImplementation(async (url: string) => {
+    if (url.startsWith('/teams/'))
+      return { data: { members: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] } };
+    return { data: workers };
+  });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
@@ -175,7 +214,7 @@ describe('MasterNew photo retry', () => {
     expect(await screen.findByText('Фото 0 из 5')).toBeTruthy();
     for (let i = 0; i < 5; i++) {
       const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
-    await waitFor(() => expect(gallery).toBeEnabled());
+      await waitFor(() => expect(gallery).toBeEnabled());
       await u.upload(gallery, new File([`img${i}`], `p${i}.jpg`, { type: 'image/jpeg' }));
       await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(i + 1));
     }

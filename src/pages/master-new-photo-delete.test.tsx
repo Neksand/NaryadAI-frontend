@@ -23,7 +23,13 @@ const photoMocks = vi.hoisted(() => ({
 }));
 const offlinePhotoMocks = vi.hoisted(() => ({
   saveOfflinePhoto: vi.fn(async () => ({ localId: 'loc1', kind: 'before' })),
-  getOfflinePhoto: vi.fn(async () => ({ localId: 'loc1', kind: 'before', name: 'a.jpg', type: 'image/jpeg', data: new Blob(['img'], { type: 'image/jpeg' }) })),
+  getOfflinePhoto: vi.fn(async () => ({
+    localId: 'loc1',
+    kind: 'before',
+    name: 'a.jpg',
+    type: 'image/jpeg',
+    data: new Blob(['img'], { type: 'image/jpeg' }),
+  })),
   removeOfflinePhotos: vi.fn(async () => {}),
   readStagedFile: vi.fn(async () => null),
   addOfflinePhotoDraftRef: vi.fn(async () => {}),
@@ -90,7 +96,11 @@ beforeEach(() => {
     if (name === 'teams') return [];
     return [];
   });
-  apiGetMock.mockResolvedValue({ data: workers });
+  apiGetMock.mockImplementation(async (url: string) => {
+    if (url.startsWith('/teams/'))
+      return { data: { members: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] } };
+    return { data: workers };
+  });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
@@ -115,7 +125,7 @@ describe('MasterNew broken preview', () => {
       renderNew();
       await screen.findByRole('option', { name: 'Участок 1' });
       const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
-    await waitFor(() => expect(picker).toBeEnabled());
+      await waitFor(() => expect(picker).toBeEnabled());
       await u.upload(picker, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
       await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
       const img = (await screen.findByAltText('Фото «до»')) as HTMLImageElement;

@@ -7,7 +7,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const store = vi.hoisted(() => new Map<string, unknown>());
 const transitionMock = vi.hoisted(() => vi.fn(async () => ({})));
 const uploadMock = vi.hoisted(() =>
-  vi.fn(async (_blob: Blob, _kind: 'before' | 'after', _orderId?: string) => ({ id: 'remote-photo' })),
+  vi.fn(async (_blob: Blob, _kind: 'before' | 'after', _orderId?: string) => ({
+    id: 'remote-photo',
+  })),
 );
 
 vi.mock('idb-keyval', () => ({

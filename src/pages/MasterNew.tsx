@@ -17,7 +17,7 @@ import { VoiceButton } from '../components/VoiceButton';
 import { DateTimeField } from '../components/DateTimeField';
 import { AITag, ErrorState } from '../components/ui';
 import { Lightbox, type LightboxItem } from '../components/Lightbox';
-import { toLocalizedError, newUUID } from '../lib/api-client';
+import { api, toLocalizedError, newUUID } from '../lib/api-client';
 import { pickName } from '../lib/names';
 import { Icon } from '../components/Icon';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
@@ -115,7 +115,58 @@ export default function MasterNew() {
       }
     },
   });
-  const crews = useQuery({ queryKey: ['catalog', 'teams'], queryFn: () => catalogList('teams') });
+  const crews = useQuery({
+    queryKey: ['catalog', 'teams', form.area_id || 'all'],
+    queryFn: () => catalogList('teams', form.area_id ? { area_id: form.area_id } : {}),
+  });
+  // Исполнители участка: члены его бригад (со статусами). Без участка — все.
+  const areaWorkers = useQuery({
+    queryKey: ['workers', 'by-area', form.area_id || 'all'],
+    queryFn: async () => {
+      if (!form.area_id) return null;
+      const teamsRaw = await catalogList('teams', { area_id: form.area_id });
+      const teams = (Array.isArray(teamsRaw) ? teamsRaw : []) as {
+        id: string;
+      }[];
+      const out: {
+        id: string;
+        full_name?: string;
+        name?: string;
+        current_status?: string;
+        crew_id?: string;
+      }[] = [];
+      for (const team of teams) {
+        if (!team?.id) continue;
+        let teamData: unknown = null;
+        try {
+          const { data } = await api.get(`/teams/${team.id}`);
+          teamData = (data as { data?: unknown }).data ?? data;
+        } catch {
+          continue;
+        }
+        const members = Array.isArray((teamData as { members?: unknown })?.members)
+          ? ((teamData as { members: typeof out }).members ?? [])
+          : [];
+        for (const m of members) out.push({ ...m, crew_id: team.id });
+      }
+      return out;
+    },
+    enabled: Boolean(form.area_id),
+    staleTime: 30000,
+  });
+  const areaWorkerIds = new Set((areaWorkers.data ?? []).map((w) => w.id));
+  const areaCrewIds = new Set(((crews.data ?? []) as { id: string }[]).map((c) => c.id));
+  const assigneeMismatch =
+    Boolean(form.area_id) &&
+    Boolean(form.assignee_id) &&
+    areaWorkers.data != null &&
+    !areaWorkerIds.has(form.assignee_id);
+  const crewMismatch =
+    Boolean(form.area_id) &&
+    Boolean(form.crew_id) &&
+    (crews.data ?? []).length >= 0 &&
+    !areaCrewIds.has(form.crew_id) &&
+    !crews.isPending;
   const similar = useQuery({
     queryKey: ['similar-repairs', form.equipment_id],
     queryFn: () => getSimilarRepairs(form.equipment_id, { limit: 3 }),
@@ -533,6 +584,8 @@ export default function MasterNew() {
     form.due_at &&
     form.description.trim().length >= 1 &&
     (form.assignee_id || form.crew_id) &&
+    !assigneeMismatch &&
+    !crewMismatch &&
     photosHydrated &&
     !create.isPending &&
     !uploadingPhoto;
@@ -563,7 +616,13 @@ export default function MasterNew() {
           <select
             className="input"
             value={form.area_id}
-            onChange={(e) => set('area_id', e.target.value)}
+            onChange={(e) => {
+              set('area_id', e.target.value);
+              // Списки исполнителей/бригад привязаны к участку — сбрасываем,
+              // чтобы не выстрелил чужой выбор с прошлого участка.
+              set('assignee_id', '');
+              set('crew_id', '');
+            }}
             required
           >
             <option value="">—</option>
@@ -646,7 +705,7 @@ export default function MasterNew() {
           >
             <option value="">—</option>
             {(
-              (workers.data ?? []) as {
+              (form.area_id ? (areaWorkers.data ?? []) : (workers.data ?? [])) as {
                 id: string;
                 full_name?: string;
                 name?: string;
@@ -662,6 +721,14 @@ export default function MasterNew() {
             ))}
           </select>
         </label>
+        {assigneeMismatch && (
+          <div className="banner banner-warn" role="note">
+            {t(
+              'master.assigneeNotInArea',
+              'Исполнитель не прикреплён к выбранному участку — выберите из списка',
+            )}
+          </div>
+        )}
         {!workers.isPending && (workers.data ?? []).length === 0 && (
           <div className="banner banner-warn" role="note">
             {t('master.noWorkers')}
@@ -687,6 +754,14 @@ export default function MasterNew() {
             ))}
           </select>
         </label>
+        {crewMismatch && (
+          <div className="banner banner-warn" role="note">
+            {t(
+              'master.crewNotInArea',
+              'Бригада не относится к выбранному участку — выберите из списка',
+            )}
+          </div>
+        )}
         <div className="flex gap-2">
           <button
             className="btn btn-ai"

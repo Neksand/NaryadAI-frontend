@@ -94,7 +94,11 @@ beforeEach(() => {
     if (name === 'teams') return crews;
     return [];
   });
-  apiGetMock.mockResolvedValue({ data: workers });
+  apiGetMock.mockImplementation(async (url: string) => {
+    if (url.startsWith('/teams/'))
+      return { data: { members: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] } };
+    return { data: workers };
+  });
 });
 
 describe('MasterNew kind and validation', () => {
@@ -190,13 +194,21 @@ describe('MasterNew assignee logic', () => {
 
   it('warns when no areas', async () => {
     miscMock.mockResolvedValue([]);
-    apiGetMock.mockResolvedValue({ data: [] });
+    apiGetMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/teams/'))
+        return { data: { members: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] } };
+      return { data: [] };
+    });
     renderNew();
     await waitFor(() => expect(screen.getByText(/привязать участки вашей учётке/)).toBeTruthy());
   });
 
   it('warns when no workers on areas', async () => {
-    apiGetMock.mockResolvedValue({ data: [] });
+    apiGetMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/teams/'))
+        return { data: { members: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] } };
+      return { data: [] };
+    });
     renderNew();
     await waitFor(() => expect(screen.getByText(/Администратор добавляет их там же/)).toBeTruthy());
   });
@@ -279,7 +291,11 @@ describe('MasterNew AI and photo', () => {
 
 it('captures downtime and comment and displays current worker availability', async () => {
   const u = userEvent.setup();
-  apiGetMock.mockResolvedValue({ data: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] });
+  apiGetMock.mockImplementation(async (url: string) => {
+    if (url.startsWith('/teams/'))
+      return { data: { members: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] } };
+    return { data: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] };
+  });
   renderNew();
   expect(await screen.findByRole('option', { name: 'Иван · Свободен' })).toBeVisible();
   await u.selectOptions(screen.getByLabelText(/Участок/), 'a1');

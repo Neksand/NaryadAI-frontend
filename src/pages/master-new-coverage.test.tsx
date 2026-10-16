@@ -23,8 +23,27 @@ vi.mock('../api/workOrders', () => ({
 }));
 vi.mock('../api/ai', () => ({ suggestAssignee: mocks.suggest }));
 vi.mock('../api/misc', () => ({ catalogList: mocks.catalog }));
-vi.mock('../api/photos', () => ({ uploadPhoto: mocks.upload, describePhotoFailure: () => 'diag', ensureFileReadable: async () => {}, photoSourceLabel: () => 'source' }));
-vi.mock('../lib/offline-photos', () => ({ saveOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before' }), getOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before', name: 'a.jpg', type: 'image/jpeg', data: new Blob(['img'], { type: 'image/jpeg' }) }), readStagedFile: async () => null, addOfflinePhotoDraftRef: async () => {}, listOfflinePhotoDraftRefs: async () => [], removeOfflinePhotoDraftRefs: async () => {}, removeOfflinePhotos: async () => {} }));
+vi.mock('../api/photos', () => ({
+  uploadPhoto: mocks.upload,
+  describePhotoFailure: () => 'diag',
+  ensureFileReadable: async () => {},
+  photoSourceLabel: () => 'source',
+}));
+vi.mock('../lib/offline-photos', () => ({
+  saveOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before' }),
+  getOfflinePhoto: async () => ({
+    localId: 'loc1',
+    kind: 'before',
+    name: 'a.jpg',
+    type: 'image/jpeg',
+    data: new Blob(['img'], { type: 'image/jpeg' }),
+  }),
+  readStagedFile: async () => null,
+  addOfflinePhotoDraftRef: async () => {},
+  listOfflinePhotoDraftRefs: async () => [],
+  removeOfflinePhotoDraftRefs: async () => {},
+  removeOfflinePhotos: async () => {},
+}));
 vi.mock('../hooks/useWS', () => ({
   useRealtime: () => ({ status: 'closed', reconnected: false }),
 }));
@@ -83,7 +102,11 @@ beforeEach(async () => {
   mocks.similar.mockResolvedValue([]);
   mocks.suggest.mockResolvedValue([]);
   mocks.upload.mockResolvedValue({ id: 'photo-1' });
-  mocks.get.mockResolvedValue({ data: [{ id: 'w1', full_name: 'Иван' }] });
+  mocks.get.mockImplementation(async (url: string) => {
+    if (url.startsWith('/teams/'))
+      return { data: { members: [{ id: 'w1', full_name: 'Иван', current_status: 'free' }] } };
+    return { data: [{ id: 'w1', full_name: 'Иван' }] };
+  });
   mocks.catalog.mockImplementation(async (name) => {
     if (name === 'sites') return [{ id: 'a1', name: 'Цех 1' }];
     if (name === 'equipment') return [{ id: 'e1', name: 'Насос 1' }];
@@ -151,10 +174,18 @@ describe('MasterNew creation boundaries', () => {
   });
 
   it.each(['items', 'data'])('supports the workers %s envelope and name fallbacks', async (key) => {
-    mocks.get.mockResolvedValue({
-      data: {
-        [key]: [{ id: 'w1', name: 'Ерлан', current_status: 'unknown-status' }, { id: 'w2' }],
-      },
+    mocks.get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/teams/'))
+        return {
+          data: {
+            members: [{ id: 'w1', name: 'Ерлан', current_status: 'unknown-status' }, { id: 'w2' }],
+          },
+        };
+      return {
+        data: {
+          [key]: [{ id: 'w1', name: 'Ерлан', current_status: 'unknown-status' }, { id: 'w2' }],
+        },
+      };
     });
     renderNew();
     expect(await screen.findByRole('option', { name: 'Ерлан · unknown-status' })).toBeVisible();
@@ -162,7 +193,10 @@ describe('MasterNew creation boundaries', () => {
   });
 
   it('handles an empty workers envelope and an unnamed crew without losing its identifier', async () => {
-    mocks.get.mockResolvedValue({ data: {} });
+    mocks.get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/teams/')) return { data: { members: [] } };
+      return { data: {} };
+    });
     mocks.catalog.mockImplementation(async (name) =>
       name === 'teams' ? [{ id: 'crew-without-name' }] : [],
     );

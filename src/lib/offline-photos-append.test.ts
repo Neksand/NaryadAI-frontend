@@ -42,8 +42,20 @@ describe('staged offline photo helpers', () => {
   });
 
   it('persists attachment refs across a remount and removes only explicitly detached refs', async () => {
-    const first = await saveOfflinePhoto('worker-a', new Blob(['first']), 'after', 'one.jpg', 'camera');
-    const second = await saveOfflinePhoto('worker-a', new Blob(['second']), 'after', 'two.jpg', 'picker');
+    const first = await saveOfflinePhoto(
+      'worker-a',
+      new Blob(['first']),
+      'after',
+      'one.jpg',
+      'camera',
+    );
+    const second = await saveOfflinePhoto(
+      'worker-a',
+      new Blob(['second']),
+      'after',
+      'two.jpg',
+      'picker',
+    );
     await addOfflinePhotoDraftRef('worker-a', 'worker-order:o1', {
       localId: first.localId,
       kind: 'after',

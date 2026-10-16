@@ -218,8 +218,7 @@ export async function uploadPhoto(
 /** Диагностика неуспешной загрузки: размер, длительность, код — для поля боя с каналом. */
 export function photoSourceLabel(source?: OfflinePhotoSource): string | undefined {
   if (source === 'camera') return 'источник: камера (запрошен режим съёмки)';
-  if (source === 'picker')
-    return 'источник: системный выбор (галерея/файлы/SD не различаются)';
+  if (source === 'picker') return 'источник: системный выбор (галерея/файлы/SD не различаются)';
   return undefined;
 }
 
