@@ -21,6 +21,7 @@ const photoMocks = vi.hoisted(() => ({
   uploadPhoto: vi.fn(async () => ({ id: 'p1' })),
   listOrderPhotos: vi.fn(async () => []),
   describePhotoFailure: () => 'diag',
+  photoSourceLabel: (s) => s ?? 'unknown',
   ensureFileReadable: async () => {},
 }));
 const suggestMock = vi.hoisted(() => vi.fn(async () => null));
@@ -29,6 +30,17 @@ const dictMock = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []));
 vi.mock('../api/workOrders', () => woMocks);
 vi.mock('../api/misc', () => ({ dictList: dictMock }));
 vi.mock('../api/photos', () => photoMocks);
+vi.mock('../lib/offline-photos', () => ({
+  saveOfflinePhoto: async () => ({ localId: 'loc1', kind: 'after' }),
+  getOfflinePhoto: async () => ({
+    localId: 'loc1',
+    kind: 'after',
+    name: 'a.jpg',
+    type: 'image/jpeg',
+    data: new Blob(['img'], { type: 'image/jpeg' }),
+  }),
+  removeOfflinePhotos: async () => {},
+}));
 vi.mock('../api/ai', () => ({ suggestFaultCode: suggestMock }));
 vi.mock('../hooks/useOfflineQueue', () => ({
   useOfflineQueue: () => ({
@@ -98,6 +110,7 @@ describe('WorkerOrder photos', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Завершить' })).toBeTruthy());
     await u.click(screen.getAllByRole('button', { name: 'Завершить' })[0]);
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await waitFor(() => expect(input).toBeEnabled());
     await u.upload(input, new File(['img'], 'after.jpg', { type: 'image/jpeg' }));
     await waitFor(() =>
       expect(photoMocks.uploadPhoto).toHaveBeenCalledWith(

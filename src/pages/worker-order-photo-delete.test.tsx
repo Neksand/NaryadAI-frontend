@@ -19,11 +19,19 @@ const dictMock = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []));
 const photoMocks = vi.hoisted(() => ({
   ensureFileReadable: async () => {},
   uploadPhoto: vi.fn(async () => ({ id: 'p1' })),
+  photoSourceLabel: (s) => s ?? 'unknown',
   listOrderPhotos: vi.fn(async () => []),
   deletePhoto: vi.fn(async () => {}),
 }));
 const offlinePhotoMocks = vi.hoisted(() => ({
   saveOfflinePhoto: vi.fn(async () => ({ localId: 'loc-after-1', kind: 'after' })),
+  getOfflinePhoto: vi.fn(async () => ({
+    localId: 'loc1',
+    kind: 'after',
+    name: 'a.jpg',
+    type: 'image/jpeg',
+    data: new Blob(['img'], { type: 'image/jpeg' }),
+  })),
   removeOfflinePhotos: vi.fn(async () => {}),
 }));
 const queueState = vi.hoisted(() => ({ online: true }));
@@ -152,6 +160,7 @@ describe('WorkerOrder photo delete', () => {
     renderOrder([]);
     await openComplete(u);
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['img'], 'after.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(offlinePhotoMocks.saveOfflinePhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото loc-after-1');

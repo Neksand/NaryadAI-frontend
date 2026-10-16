@@ -18,11 +18,17 @@ const miscMock = vi.hoisted(() => vi.fn(async () => []));
 const photoMocks = vi.hoisted(() => ({
   ensureFileReadable: async () => {},
   uploadPhoto: vi.fn(async () => ({ id: 'ph1' })),
+  photoSourceLabel: (s) => s ?? 'unknown',
   deletePhoto: vi.fn(async () => {}),
 }));
 const offlinePhotoMocks = vi.hoisted(() => ({
   saveOfflinePhoto: vi.fn(async () => ({ localId: 'loc1', kind: 'before' })),
+  getOfflinePhoto: vi.fn(async () => ({ localId: 'loc1', kind: 'before', name: 'a.jpg', type: 'image/jpeg', data: new Blob(['img'], { type: 'image/jpeg' }) })),
   removeOfflinePhotos: vi.fn(async () => {}),
+  readStagedFile: vi.fn(async () => null),
+  addOfflinePhotoDraftRef: vi.fn(async () => {}),
+  listOfflinePhotoDraftRefs: async () => [],
+  removeOfflinePhotoDraftRefs: async () => {},
 }));
 const queueMocks = vi.hoisted(() => ({
   online: true,
@@ -109,6 +115,7 @@ describe('MasterNew broken preview', () => {
       renderNew();
       await screen.findByRole('option', { name: 'Участок 1' });
       const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(picker).toBeEnabled());
       await u.upload(picker, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
       await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
       const img = (await screen.findByAltText('Фото «до»')) as HTMLImageElement;
@@ -129,6 +136,7 @@ describe('MasterNew photo delete', () => {
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото ph1');
@@ -149,6 +157,7 @@ describe('MasterNew photo delete', () => {
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото ph1');
@@ -169,6 +178,7 @@ describe('MasterNew photo delete', () => {
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['img'], 'b.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(offlinePhotoMocks.saveOfflinePhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото loc1');
@@ -184,6 +194,7 @@ describe('MasterNew photo delete', () => {
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalled());
     const del = await screen.findByLabelText('Удалить фото ph1');

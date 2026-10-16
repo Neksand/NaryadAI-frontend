@@ -15,19 +15,43 @@ const woMocks = vi.hoisted(() => ({
 }));
 const aiMock = vi.hoisted(() => vi.fn(async () => []));
 const miscMock = vi.hoisted(() => vi.fn(async () => []));
+const stagedRecords = vi.hoisted(() => new Map<string, any>());
+const draftRefs = vi.hoisted(() => new Map<string, any[]>());
 const photoMocks = vi.hoisted(() => ({
-  ensureFileReadable: async () => {},
+  ensureFileReadable: async (file: File) => { await file.arrayBuffer(); },
   uploadPhoto: vi.fn(async () => ({ id: 'ph1' })),
   deletePhoto: vi.fn(async () => {}),
   describePhotoFailure: (_f: unknown, _t: unknown, _e: unknown) => 'diag',
+  photoSourceLabel: (source?: string) => `source: ${source ?? 'unknown'}`,
 }));
 const offlinePhotoMocks = vi.hoisted(() => ({
-  saveOfflinePhoto: vi.fn(async () => ({ localId: 'loc1', kind: 'before' })),
-  removeOfflinePhotos: vi.fn(async () => {}),
+  saveOfflinePhoto: vi.fn(async (_userId: string, file: File, kind: 'before' | 'after', name?: string, source?: string) => {
+    const localId = 'loc1';
+    const rec = { localId, kind, name: name ?? file.name, type: file.type, source, data: new Blob([await file.arrayBuffer()], { type: file.type }) };
+    stagedRecords.set(localId, rec);
+    return rec;
+  }),
+  getOfflinePhoto: vi.fn(async (_userId: string, localId: string) => stagedRecords.get(localId)),
+  readStagedFile: vi.fn(async (_userId: string, localId: string) => {
+    const record = stagedRecords.get(localId);
+    return record ? { record, file: new File([record.data], record.name, { type: record.type }) } : null;
+  }),
+  addOfflinePhotoDraftRef: vi.fn(async (userId: string, key: string, ref: any) => {
+    const draftKey = `${userId}:${key}`;
+    const refs = draftRefs.get(draftKey) ?? [];
+    if (!refs.some((item) => item.localId === ref.localId)) draftRefs.set(draftKey, [...refs, ref]);
+  }),
+  listOfflinePhotoDraftRefs: vi.fn(async (userId: string, key: string) => draftRefs.get(`${userId}:${key}`) ?? []),
+  removeOfflinePhotoDraftRefs: vi.fn(async (userId: string, key: string, localIds: string[]) => {
+    const draftKey = `${userId}:${key}`;
+    draftRefs.set(draftKey, (draftRefs.get(draftKey) ?? []).filter((ref) => !localIds.includes(ref.localId)));
+  }),
+  removeOfflinePhotos: vi.fn(async (_userId: string, localIds: string[]) => { localIds.forEach((localId) => stagedRecords.delete(localId)); }),
 }));
 const queueMocks = vi.hoisted(() => ({
   online: true,
   enqueue: vi.fn(async () => {}),
+  replay: vi.fn(async () => ({ sent: 0, failed: 0 })),
 }));
 const apiGetMock = vi.hoisted(() => vi.fn(async () => ({ data: [] })));
 
@@ -42,7 +66,7 @@ vi.mock('../hooks/useOfflineQueue', () => ({
     online: queueMocks.online,
     enqueue: queueMocks.enqueue,
     remove: vi.fn(),
-    replay: vi.fn(),
+    replay: queueMocks.replay,
     replaying: false,
     lastReplayError: null,
     count: 0,
@@ -74,10 +98,17 @@ function renderNew() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  stagedRecords.clear();
+  draftRefs.clear();
+  queueMocks.replay.mockResolvedValue({ sent: 0, failed: 0 });
   queueMocks.online = true;
   photoMocks.uploadPhoto.mockResolvedValue({ id: 'ph1' });
   photoMocks.deletePhoto.mockResolvedValue(undefined);
-  offlinePhotoMocks.saveOfflinePhoto.mockResolvedValue({ localId: 'loc1', kind: 'before' });
+  offlinePhotoMocks.saveOfflinePhoto.mockImplementation(async (_u: string, file: File, kind: 'before' | 'after', name?: string, source?: string) => {
+    const rec = { localId: 'loc1', kind, name: name ?? file.name, type: file.type, source, data: new Blob([await file.arrayBuffer()], { type: file.type }) };
+    stagedRecords.set('loc1', rec);
+    return rec;
+  });
   offlinePhotoMocks.removeOfflinePhotos.mockResolvedValue(undefined);
   miscMock.mockImplementation(async (name: string) => {
     if (name === 'sites') return areas;
@@ -96,6 +127,7 @@ describe('MasterNew photo retry', () => {
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     const file = new File(['img'], 'a.jpg', { type: 'image/jpeg' });
     await u.upload(gallery, file);
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
@@ -108,7 +140,10 @@ describe('MasterNew photo retry', () => {
     await u.click(retry);
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(2));
     const secondArg = photoMocks.uploadPhoto.mock.calls[1][0] as File;
-    expect(secondArg).toBe(firstArg);
+    // Staged-загрузка: тот же контент/имя/тип, но объект уже из IDB-копии.
+    expect(secondArg.name).toBe(firstArg.name);
+    expect(secondArg.type).toBe(firstArg.type);
+    expect(secondArg.size).toBe(firstArg.size);
     // После успеха превью появилось, ошибка ушла
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
     expect(await screen.findByLabelText('Удалить фото ph2')).toBeTruthy();
@@ -120,6 +155,7 @@ describe('MasterNew photo retry', () => {
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
     const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(picker).toBeEnabled());
     await u.upload(picker, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole('button', { name: 'Повторить' })).toBeTruthy();
@@ -139,6 +175,7 @@ describe('MasterNew photo retry', () => {
     expect(await screen.findByText('Фото 0 из 5')).toBeTruthy();
     for (let i = 0; i < 5; i++) {
       const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
       await u.upload(gallery, new File([`img${i}`], `p${i}.jpg`, { type: 'image/jpeg' }));
       await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(i + 1));
     }
@@ -146,6 +183,7 @@ describe('MasterNew photo retry', () => {
     // input дизейблится с подсказкой
     const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
     expect(screen.queryByLabelText('Снять фото')).toBeNull();
+    expect(picker).not.toHaveAttribute('capture');
     expect(picker.disabled).toBe(true);
     expect(await screen.findByRole('note')).toBeTruthy();
     // Лишний файл не грузится
@@ -157,6 +195,7 @@ describe('MasterNew photo retry', () => {
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['heic'], 'photo.heic', { type: 'image/heic' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toMatch(/снимите камерой/i);
@@ -168,6 +207,7 @@ describe('MasterNew photo retry', () => {
 
     // Вариант по MIME-типу
     const gallery2 = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery2).toBeEnabled());
     await u.upload(gallery2, new File(['heic'], 'photo.jpg', { type: 'image/heic' }));
     const alert2 = await screen.findByRole('alert');
     expect(alert2.textContent).toMatch(/JPEG\/PNG/);
@@ -181,6 +221,7 @@ describe('MasterNew photo retry', () => {
     renderNew();
     await screen.findByRole('option', { name: 'Участок 1' });
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['one'], 'one.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
     expect(await screen.findByLabelText('Удалить фото ok1')).toBeTruthy();
@@ -195,6 +236,7 @@ describe('MasterNew photo retry', () => {
     // Вторая загрузка падает
     photoMocks.uploadPhoto.mockRejectedValueOnce(new Error('flaky network'));
     const gallery2 = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery2).toBeEnabled());
     await u.upload(gallery2, new File(['two'], 'two.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole('alert')).toBeTruthy();

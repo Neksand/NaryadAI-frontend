@@ -19,12 +19,20 @@ const dictMock = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []));
 const photoMocks = vi.hoisted(() => ({
   ensureFileReadable: async () => {},
   uploadPhoto: vi.fn(async () => ({ id: 'p1' })),
+  photoSourceLabel: (s) => s ?? 'unknown',
   listOrderPhotos: vi.fn(async () => []),
   deletePhoto: vi.fn(async () => {}),
   describePhotoFailure: (_f: unknown, _t: unknown, _e: unknown) => 'diag',
 }));
 const offlinePhotoMocks = vi.hoisted(() => ({
   saveOfflinePhoto: vi.fn(async () => ({ localId: 'loc-after-1', kind: 'after' })),
+  getOfflinePhoto: vi.fn(async () => ({
+    localId: 'loc1',
+    kind: 'after',
+    name: 'a.jpg',
+    type: 'image/jpeg',
+    data: new Blob(['img'], { type: 'image/jpeg' }),
+  })),
   removeOfflinePhotos: vi.fn(async () => {}),
 }));
 const queueState = vi.hoisted(() => ({ online: true }));
@@ -111,6 +119,7 @@ describe('WorkerOrder photo retry', () => {
     renderOrder([]);
     await openComplete(u);
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     const file = new File(['img'], 'after.jpg', { type: 'image/jpeg' });
     await u.upload(gallery, file);
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
@@ -121,7 +130,9 @@ describe('WorkerOrder photo retry', () => {
     await u.click(retry);
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(2));
     const secondArg = photoMocks.uploadPhoto.mock.calls[1][0] as File;
-    expect(secondArg).toBe(firstArg);
+    expect(secondArg.name).toBe(firstArg.name);
+    expect(secondArg.type).toBe(firstArg.type);
+    expect(secondArg.size).toBe(firstArg.size);
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
 
@@ -145,6 +156,7 @@ describe('WorkerOrder photo retry', () => {
     await openComplete(u);
     expect(await screen.findByText('Фото 1 из 10')).toBeTruthy();
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     expect(gallery.disabled).toBe(false);
   });
 
@@ -153,6 +165,7 @@ describe('WorkerOrder photo retry', () => {
     renderOrder([]);
     await openComplete(u);
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['heic'], 'img.HEIC', { type: 'image/jpeg' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toMatch(/снимите камерой/i);
@@ -162,6 +175,7 @@ describe('WorkerOrder photo retry', () => {
     expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull();
 
     const gallery2 = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery2).toBeEnabled());
     await u.upload(gallery2, new File(['heic'], 'img.jpg', { type: 'image/heif' }));
     const alert2 = await screen.findByRole('alert');
     expect(alert2.textContent).toMatch(/JPEG\/PNG/);
@@ -175,6 +189,7 @@ describe('WorkerOrder photo retry', () => {
     await u.type(screen.getByLabelText(/Что сделано/), 'Заменил подшипник');
     photoMocks.uploadPhoto.mockRejectedValueOnce(new Error('flaky'));
     const gallery = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
+    await waitFor(() => expect(gallery).toBeEnabled());
     await u.upload(gallery, new File(['x'], 'fail.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(photoMocks.uploadPhoto).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole('alert')).toBeTruthy();

@@ -23,7 +23,8 @@ vi.mock('../api/workOrders', () => ({
 }));
 vi.mock('../api/ai', () => ({ suggestAssignee: mocks.suggest }));
 vi.mock('../api/misc', () => ({ catalogList: mocks.catalog }));
-vi.mock('../api/photos', () => ({ uploadPhoto: mocks.upload, describePhotoFailure: () => 'diag', ensureFileReadable: async () => {} }));
+vi.mock('../api/photos', () => ({ uploadPhoto: mocks.upload, describePhotoFailure: () => 'diag', ensureFileReadable: async () => {}, photoSourceLabel: () => 'source' }));
+vi.mock('../lib/offline-photos', () => ({ saveOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before' }), getOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before', name: 'a.jpg', type: 'image/jpeg', data: new Blob(['img'], { type: 'image/jpeg' }) }), readStagedFile: async () => null, addOfflinePhotoDraftRef: async () => {}, listOfflinePhotoDraftRefs: async () => [], removeOfflinePhotoDraftRefs: async () => {}, removeOfflinePhotos: async () => {} }));
 vi.mock('../hooks/useWS', () => ({
   useRealtime: () => ({ status: 'closed', reconnected: false }),
 }));
@@ -212,6 +213,7 @@ describe('MasterNew evidence and recommendations', () => {
     mocks.upload.mockReturnValueOnce(pending.promise);
     const u = userEvent.setup();
     renderNew();
+    await waitFor(() => expect(photoInput()).toBeEnabled());
     fireEvent.change(photoInput(), { target: { files: [] } });
     expect(mocks.upload).not.toHaveBeenCalled();
     await u.upload(photoInput(), photo('failed.jpg'));
@@ -227,6 +229,7 @@ describe('MasterNew evidence and recommendations', () => {
   it('limits evidence to five photos even if an extra change event is dispatched', async () => {
     const u = userEvent.setup();
     renderNew();
+    await waitFor(() => expect(photoInput()).toBeEnabled());
     for (let index = 1; index <= 5; index += 1) {
       mocks.upload.mockResolvedValueOnce({ id: `photo-${index}` });
       await u.upload(photoInput(), photo(`${index}.jpg`));

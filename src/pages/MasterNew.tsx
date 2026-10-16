@@ -1,11 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { createWorkOrder, getSimilarRepairs } from '../api/workOrders';
 import { suggestAssignee } from '../api/ai';
 import { catalogList } from '../api/misc';
-import { uploadPhoto, deletePhoto, describePhotoFailure, ensureFileReadable } from '../api/photos';
+import {
+  uploadPhoto,
+  deletePhoto,
+  describePhotoFailure,
+  ensureFileReadable,
+  photoSourceLabel,
+} from '../api/photos';
 import { Shell, roleTabs } from '../components/Shell';
 import { VoiceButton } from '../components/VoiceButton';
 import { DateTimeField } from '../components/DateTimeField';
@@ -15,10 +21,21 @@ import { toLocalizedError, newUUID } from '../lib/api-client';
 import { pickName } from '../lib/names';
 import { Icon } from '../components/Icon';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
-import { saveOfflinePhoto, removeOfflinePhotos, type PendingPhotoRef } from '../lib/offline-photos';
+import {
+  saveOfflinePhoto,
+  getOfflinePhoto,
+  readStagedFile,
+  addOfflinePhotoDraftRef,
+  listOfflinePhotoDraftRefs,
+  removeOfflinePhotoDraftRefs,
+  removeOfflinePhotos,
+  type OfflinePhotoSource,
+  type PendingPhotoRef,
+} from '../lib/offline-photos';
 import { useAuthStore } from '../store/auth-store';
 
 const BEFORE_LIMIT = 5;
+const MASTER_NEW_DRAFT_KEY = 'master-new';
 
 function isHeicFile(f: File): boolean {
   const name = (f.name || '').toLowerCase();
@@ -54,8 +71,16 @@ export default function MasterNew() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
-  // Последний неуспешный файл для кнопки «Повторить» (повтор без перевыбора).
-  const [pendingFailedFile, setPendingFailedFile] = useState<File | null>(null);
+  // Durable retries use the IndexedDB id. A picker File is retained only if
+  // IndexedDB itself could not stage the initial selection.
+  const [pendingFailedPhoto, setPendingFailedPhoto] = useState<
+    | { localId: string; source: OfflinePhotoSource }
+    | { file: File; source: OfflinePhotoSource }
+    | null
+  >(null);
+  const photoBusyRef = useRef(false);
+  const previewUrlsRef = useRef<Record<string, string>>({});
+  const [photosHydrated, setPhotosHydrated] = useState(false);
   // Offline draft photos: blobs in per-employee IndexedDB, uploaded before create.
   const [pendingLocalPhotos, setPendingLocalPhotos] = useState<PendingPhotoRef[]>([]);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
@@ -67,6 +92,10 @@ export default function MasterNew() {
   const [draftQueued, setDraftQueued] = useState(false);
   const offline = useOfflineQueue();
   const draftUserId = useAuthStore((s) => s.user?.id ?? 'anonymous');
+  const queuedPhotoIds = offline.queue
+    .flatMap((op) => (op.pendingPhotos ?? []).map((photo) => photo.localId))
+    .sort()
+    .join('|');
 
   const areas = useQuery({ queryKey: ['catalog', 'sites'], queryFn: () => catalogList('sites') });
   const equipment = useQuery({
@@ -124,7 +153,7 @@ export default function MasterNew() {
         !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
       // Offline draft with photos: persist blobs per-employee, enqueue one
       // idempotent create; replay uploads photos first (upload-then-act).
-      if (isOffline && pendingLocalPhotos.length > 0) {
+      if (pendingLocalPhotos.length > 0) {
         const key = newUUID();
         await offline.enqueue({
           key,
@@ -135,7 +164,22 @@ export default function MasterNew() {
           pendingPhotos: pendingLocalPhotos.map((p) => ({ localId: p.localId, kind: p.kind })),
           clientAt: new Date().toISOString(),
         });
+        await removeOfflinePhotoDraftRefs(
+          draftUserId,
+          MASTER_NEW_DRAFT_KEY,
+          pendingLocalPhotos.map((photo) => photo.localId),
+        );
         setPendingLocalPhotos([]);
+        setPreviewUrls((current) => {
+          const next = { ...current };
+          for (const photo of pendingLocalPhotos) {
+            const url = next[photo.localId];
+            if (url) URL.revokeObjectURL?.(url);
+            delete next[photo.localId];
+          }
+          return next;
+        });
+        if (!isOffline) void offline.replay();
         return { queued: true as const };
       }
       if (isOffline) {
@@ -176,69 +220,239 @@ export default function MasterNew() {
     return undefined;
   };
 
-  const handlePhotoFile = async (f: File) => {
-    if (uploadingPhoto || totalPhotos >= BEFORE_LIMIT) return;
+  useEffect(() => {
+    previewUrlsRef.current = previewUrls;
+  }, [previewUrls]);
+
+  useEffect(() => {
+    let active = true;
+    setPhotosHydrated(false);
+    setPendingLocalPhotos([]);
+    setPendingFailedPhoto(null);
+    const load = async () => {
+      const queuedIds = new Set(queuedPhotoIds.split('|').filter(Boolean));
+      const refs = await listOfflinePhotoDraftRefs(draftUserId, MASTER_NEW_DRAFT_KEY);
+      const available: PendingPhotoRef[] = [];
+      const missing: string[] = [];
+      const urls: Record<string, string> = {};
+      for (const ref of refs) {
+        if (queuedIds.has(ref.localId)) {
+          missing.push(ref.localId);
+          continue;
+        }
+        const record = await getOfflinePhoto(draftUserId, ref.localId);
+        if (!record?.data) {
+          missing.push(ref.localId);
+          continue;
+        }
+        available.push({ ...ref, source: ref.source ?? record.source });
+        const url = makePreviewUrl(record.data);
+        if (url) urls[ref.localId] = url;
+      }
+      if (!active) {
+        Object.values(urls).forEach((url) => URL.revokeObjectURL?.(url));
+        return;
+      }
+      if (missing.length) {
+        await removeOfflinePhotoDraftRefs(draftUserId, MASTER_NEW_DRAFT_KEY, missing);
+      }
+      setPendingLocalPhotos(available);
+      setPreviewUrls((current) => {
+        const stale = new Set([...refs.map((ref) => ref.localId), ...queuedIds]);
+        for (const key of stale) {
+          if (urls[key] || !current[key]) continue;
+          URL.revokeObjectURL?.(current[key]);
+        }
+        const next = { ...current };
+        stale.forEach((key) => {
+          if (!urls[key]) delete next[key];
+        });
+        return { ...next, ...urls };
+      });
+      setPhotosHydrated(true);
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+    // makePreviewUrl only uses URL and has no component state dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftUserId, queuedPhotoIds]);
+
+  useEffect(
+    () => () => {
+      Object.values(previewUrlsRef.current).forEach((url) => {
+        try {
+          URL.revokeObjectURL?.(url);
+        } catch {
+          /* object URL cleanup is best effort */
+        }
+      });
+    },
+    [],
+  );
+
+  const handlePhotoFile = async (f: File, source: OfflinePhotoSource = 'picker') => {
+    if (photoBusyRef.current || !photosHydrated) return;
+    if (totalPhotos >= BEFORE_LIMIT) return;
+    photoBusyRef.current = true;
+    setUploadingPhoto(true);
     const startedAt = Date.now();
     if (isHeicFile(f)) {
       setPhotoError(
         t('master.heicHint', 'HEIC не поддерживается: снимите камерой или выберите JPEG/PNG'),
       );
+      photoBusyRef.current = false;
+      setUploadingPhoto(false);
+      return;
+    }
+    // Staged-загрузка: байты СРАЗУ в IDB. Дальше оригинал f не трогаем —
+    // всё (превью, сжатие, заливка) идёт из IDB-копии, ей гранты не страшны.
+    let staged: File;
+    let stagedLocalId: string | null = null;
+    try {
+      const rec = await saveOfflinePhoto(draftUserId, f, 'before', f.name, source);
+      stagedLocalId = rec.localId;
+      const back = await getOfflinePhoto(draftUserId, rec.localId);
+      const bytes = back?.data ?? null;
+      if (!bytes) throw new Error('PHOTO_FILE_UNREADABLE: файл недоступен на устройстве');
+      staged = new File([bytes], rec.name || f.name, { type: bytes.type || f.type });
+    } catch (err) {
+      if (stagedLocalId) await removeOfflinePhotos(draftUserId, [stagedLocalId]).catch(() => {});
+      setPhotoError(
+        `${err instanceof Error ? err.message.replace(/^PHOTO_FILE_UNREADABLE:\s*/, '') : String(err)} · ${photoSourceLabel(source)}`,
+      );
+      setPendingFailedPhoto({ file: f, source });
+      photoBusyRef.current = false;
+      setUploadingPhoto(false);
+      return;
+    }
+    const localId = stagedLocalId;
+    try {
+      await ensureFileReadable(staged);
+    } catch (err) {
+      await removeOfflinePhotos(draftUserId, [localId]).catch(() => {});
+      setPhotoError(
+        `${err instanceof Error ? err.message.replace(/^PHOTO_FILE_UNREADABLE:\s*/, '') : String(err)} · ${photoSourceLabel(source)}`,
+      );
+      setPendingFailedPhoto({ file: f, source });
+      photoBusyRef.current = false;
+      setUploadingPhoto(false);
       return;
     }
     try {
-      await ensureFileReadable(f);
+      await addOfflinePhotoDraftRef(draftUserId, MASTER_NEW_DRAFT_KEY, {
+        localId,
+        kind: 'before',
+        source,
+      });
     } catch (err) {
-      setPhotoError(
-        err instanceof Error ? err.message.replace(/^PHOTO_FILE_UNREADABLE:\s*/, '') : String(err),
-      );
+      await removeOfflinePhotos(draftUserId, [localId]).catch(() => {});
+      setPhotoError(`${toLocalizedError(err).message} · ${photoSourceLabel(source)}`);
+      setPendingFailedPhoto({ file: f, source });
+      photoBusyRef.current = false;
+      setUploadingPhoto(false);
       return;
     }
+    const preview = makePreviewUrl(staged);
+    if (preview) setPreviewUrls((p) => ({ ...p, [localId]: preview }));
+    setPendingLocalPhotos((p) => [...p, { localId, kind: 'before', source }]);
     const offlineNow =
       !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
     if (offlineNow) {
-      try {
-        setUploadingPhoto(true);
-        setPhotoError(null);
-        const rec = await saveOfflinePhoto(draftUserId, f, 'before', f.name);
-        const url = makePreviewUrl(f);
-        if (url) setPreviewUrls((p) => ({ ...p, [rec.localId]: url }));
-        setPendingLocalPhotos((p) =>
-          p.length >= BEFORE_LIMIT ? p : [...p, { localId: rec.localId, kind: rec.kind }],
-        );
-        setPendingFailedFile(null);
-      } catch (err) {
-        setPhotoError(
-          `${toLocalizedError(err).message} (${describePhotoFailure(f, startedAt, err)})`,
-        );
-        setPendingFailedFile(f);
-      } finally {
-        setUploadingPhoto(false);
-      }
+      setPhotoError(null);
+      setPendingFailedPhoto(null);
+      photoBusyRef.current = false;
+      setUploadingPhoto(false);
       return;
     }
     try {
-      setUploadingPhoto(true);
       setUploadPct(null);
       setPhotoError(null);
-      const preview = makePreviewUrl(f);
-      const r = await uploadPhoto(f, 'before', undefined, (pct) => setUploadPct(pct));
-      if (preview) setPreviewUrls((p) => ({ ...p, [r.id]: preview }));
+      const r = await uploadPhoto(staged, 'before', undefined, (pct) => setUploadPct(pct));
+      if (preview) {
+        setPreviewUrls((p) => {
+          const next = { ...p, [r.id]: preview };
+          delete next[localId];
+          return next;
+        });
+      }
       setPhotoIds((p) => [...p, r.id]);
-      setPendingFailedFile(null);
+      setPendingLocalPhotos((p) => p.filter((item) => item.localId !== localId));
+      await removeOfflinePhotoDraftRefs(draftUserId, MASTER_NEW_DRAFT_KEY, [localId]);
+      await removeOfflinePhotos(draftUserId, [localId]);
+      setPendingFailedPhoto(null);
     } catch (err) {
       setPhotoError(
-        `${toLocalizedError(err).message} (${describePhotoFailure(f, startedAt, err)})`,
+        `${toLocalizedError(err).message} (${describePhotoFailure(staged, startedAt, err, source)})`,
       );
-      setPendingFailedFile(f);
+      setPendingFailedPhoto({ localId, source });
     } finally {
+      photoBusyRef.current = false;
+      setUploadingPhoto(false);
+      setUploadPct(null);
+    }
+  };
+
+  const retryStagedPhoto = async (localId: string, selectedSource: OfflinePhotoSource) => {
+    if (photoBusyRef.current) return;
+    photoBusyRef.current = true;
+    setUploadingPhoto(true);
+    const startedAt = Date.now();
+    let stagedFile: File | null = null;
+    let source = selectedSource;
+    try {
+      const staged = await readStagedFile(draftUserId, localId);
+      if (!staged) throw new Error('Фото больше не найдено в локальном хранилище');
+      stagedFile = staged.file;
+      source = staged.record.source ?? selectedSource;
+      await ensureFileReadable(staged.file);
+      const isOffline =
+        !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
+      if (isOffline) {
+        throw new Error('Нет подключения к сети');
+      }
+      setPhotoError(null);
+      const result = await uploadPhoto(staged.file, 'before', undefined, setUploadPct);
+      const existingPreview = previewUrlsRef.current[localId];
+      setPhotoIds((p) => (p.includes(result.id) ? p : [...p, result.id]));
+      setPendingLocalPhotos((p) => p.filter((photo) => photo.localId !== localId));
+      setPreviewUrls((p) => {
+        const next = { ...p };
+        delete next[localId];
+        if (existingPreview) next[result.id] = existingPreview;
+        return next;
+      });
+      await removeOfflinePhotoDraftRefs(draftUserId, MASTER_NEW_DRAFT_KEY, [localId]);
+      await removeOfflinePhotos(draftUserId, [localId]);
+      setPendingFailedPhoto(null);
+    } catch (err) {
+      if (!stagedFile) {
+        await removeOfflinePhotoDraftRefs(draftUserId, MASTER_NEW_DRAFT_KEY, [localId]);
+        await removeOfflinePhotos(draftUserId, [localId]);
+        setPendingLocalPhotos((p) => p.filter((photo) => photo.localId !== localId));
+        setPendingFailedPhoto(null);
+        setPhotoError('Фото больше не найдено в хранилище. Выберите его повторно.');
+      } else {
+        setPhotoError(
+          `${toLocalizedError(err).message} (${describePhotoFailure(stagedFile, startedAt, err, source)})`,
+        );
+        setPendingFailedPhoto({ localId, source });
+      }
+    } finally {
+      photoBusyRef.current = false;
       setUploadingPhoto(false);
       setUploadPct(null);
     }
   };
 
   const handleRetryPhoto = () => {
-    if (uploadingPhoto || !pendingFailedFile) return;
-    void handlePhotoFile(pendingFailedFile);
+    if (photoBusyRef.current || !pendingFailedPhoto) return;
+    if ('localId' in pendingFailedPhoto) {
+      void retryStagedPhoto(pendingFailedPhoto.localId, pendingFailedPhoto.source);
+    } else {
+      void handlePhotoFile(pendingFailedPhoto.file, pendingFailedPhoto.source);
+    }
   };
 
   // Возврат из камеры/сна часто убивает висящую загрузку: при появлении сети
@@ -266,6 +480,7 @@ export default function MasterNew() {
       setPhotoIds((p) => p.filter((id) => id !== photoId));
       setPreviewUrls((p) => {
         const next = { ...p };
+        if (next[photoId]) URL.revokeObjectURL?.(next[photoId]);
         delete next[photoId];
         return next;
       });
@@ -281,10 +496,12 @@ export default function MasterNew() {
     try {
       setPhotoError(null);
       setDeletingPhotoId(localId);
+      await removeOfflinePhotoDraftRefs(draftUserId, MASTER_NEW_DRAFT_KEY, [localId]);
       await removeOfflinePhotos(draftUserId, [localId]);
       setPendingLocalPhotos((p) => p.filter((item) => item.localId !== localId));
       setPreviewUrls((p) => {
         const next = { ...p };
+        if (next[localId]) URL.revokeObjectURL?.(next[localId]);
         delete next[localId];
         return next;
       });
@@ -300,6 +517,7 @@ export default function MasterNew() {
     form.due_at &&
     form.description.trim().length >= 1 &&
     (form.assignee_id || form.crew_id) &&
+    photosHydrated &&
     !create.isPending &&
     !uploadingPhoto;
 
@@ -582,17 +800,23 @@ export default function MasterNew() {
                 className="hidden"
                 accept="image/*"
                 aria-label={t('master.photoPick', 'Выбрать фото')}
-                disabled={uploadingPhoto || isPhotoLimitReached}
+                disabled={uploadingPhoto || isPhotoLimitReached || !photosHydrated}
                 title={isPhotoLimitReached ? photoLimitHint : undefined}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   e.target.value = '';
                   if (!f) return;
-                  void handlePhotoFile(f);
+                  void handlePhotoFile(f, 'picker');
                 }}
               />
             </label>
           </div>
+          <span className="text-xs opacity-70">
+            {t(
+              'master.photoPickerSourceNote',
+              'Системный выбор: галерея/файлы/SD-карта; точный источник не определяется',
+            )}
+          </span>
           {isPhotoLimitReached && (
             <span role="note" className="text-sm opacity-70">
               {photoLimitHint}
@@ -720,7 +944,7 @@ export default function MasterNew() {
           {photoError && (
             <div className="banner banner-danger" role="alert">
               {photoError}
-              {pendingFailedFile && !uploadingPhoto && (
+              {pendingFailedPhoto && !uploadingPhoto && (
                 <button type="button" className="btn btn-sm mt-2" onClick={handleRetryPhoto}>
                   {t('common.retry')}
                 </button>

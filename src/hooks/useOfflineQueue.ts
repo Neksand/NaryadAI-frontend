@@ -4,7 +4,7 @@ import { isAxiosError } from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/auth-store';
 import {
-  getOfflinePhoto,
+  readStagedBytes,
   removeOfflinePhotos,
   saveOfflinePhoto,
   type OfflinePhotoKind,
@@ -200,24 +200,23 @@ export function useOfflineQueue() {
           for (const ref of pending) {
             const cached = uploaded[ref.localId];
             if (cached) continue;
-            const rec = await getOfflinePhoto(userId, ref.localId);
-            if (!rec) {
-              // Блоб потерян (очистка хранилища) — молча дропать нельзя, объясняем.
+            const bytes = await readStagedBytes(userId, ref.localId);
+            if (!bytes) {
+              // Missing staged bytes cannot be retried; explain why this op was dropped.
               failed += 1;
-              await dropWithNotice(op, 'photo_missing', 'photo_missing');
+              await dropWithNotice(
+                op,
+                'photo_missing',
+                'An offline photo is missing. Reattach it and submit this action again.',
+              );
               outcome = 'dropped';
               break;
             }
             try {
               const targetOrderId = op.opType === 'create' ? undefined : op.orderId;
               if (!uploadPhoto) throw new Error('photo upload unavailable offline');
-              const res = await uploadPhoto(rec.data, ref.kind, targetOrderId);
+              const res = await uploadPhoto(bytes, ref.kind, targetOrderId);
               uploaded = { ...uploaded, [ref.localId]: res.id };
-              try {
-                await removeOfflinePhotos(userId, [ref.localId]);
-              } catch {
-                /* keep retrying the action; blob id already cached */
-              }
               const live = (await get<QueuedOp[]>(storeKey)) ?? [];
               const patched = live.map((queued) =>
                 queued.key === op.key
@@ -230,7 +229,11 @@ export function useOfflineQueue() {
                     }
                   : queued,
               );
+              // Commit the server id before dropping the only local copy. If
+              // the app is terminated after this write, replay can continue
+              // the action without needing the staged bytes again.
               await persist(patched);
+              await removeOfflinePhotos(userId, [ref.localId]);
             } catch (e) {
               if (isAxiosError(e) && e.response) {
                 const status = e.response.status;

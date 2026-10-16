@@ -30,7 +30,12 @@ import { toLocalizedError, newUUID } from '../lib/api-client';
 import { formatDT } from '../lib/dates';
 import { pickName } from '../lib/names';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
-import { saveOfflinePhoto, removeOfflinePhotos, type PendingPhotoRef } from '../lib/offline-photos';
+import {
+  saveOfflinePhoto,
+  getOfflinePhoto,
+  removeOfflinePhotos,
+  type PendingPhotoRef,
+} from '../lib/offline-photos';
 import { useAuthStore } from '../store/auth-store';
 import { Icon } from '../components/Icon';
 import { OfflineQueuePanel } from '../components/OfflineQueuePanel';
@@ -241,62 +246,82 @@ export default function WorkerOrder() {
       );
       return;
     }
+    if (photoCountFor(kind) >= photoLimitFor(kind)) return;
+    const startedAt = Date.now();
+    // Staged: байты СРАЗУ в IDB, дальше оригинал не трогаем.
+    let staged: File;
+    let stagedLocalId: string;
     try {
-      await ensureFileReadable(file);
-    } catch (err) {
+      const rec = await saveOfflinePhoto(photoUserId, file, kind, file.name);
+      stagedLocalId = rec.localId;
+      const back = await getOfflinePhoto(photoUserId, rec.localId);
+      const bytes = back?.data ?? null;
+      if (!bytes) throw new Error('PHOTO_FILE_UNREADABLE: файл недоступен на устройстве');
+      staged = new File([bytes], rec.name || file.name, { type: bytes.type || file.type });
+    } catch (e) {
       setPhotoError(
-        err instanceof Error ? err.message.replace(/^PHOTO_FILE_UNREADABLE:\s*/, '') : String(err),
+        e instanceof Error ? e.message.replace(/^PHOTO_FILE_UNREADABLE:\s*/, '') : String(e),
       );
       return;
     }
-    if (photoCountFor(kind) >= photoLimitFor(kind)) return;
-    const startedAt = Date.now();
+    try {
+      await ensureFileReadable(staged);
+    } catch (e) {
+      setPhotoError(
+        e instanceof Error ? e.message.replace(/^PHOTO_FILE_UNREADABLE:\s*/, '') : String(e),
+      );
+      return;
+    }
+    const cleanupStaged = () => removeOfflinePhotos(photoUserId, [stagedLocalId]).catch(() => {});
     const isOffline =
       !offline.online || (typeof navigator !== 'undefined' && navigator.onLine === false);
     if (isOffline) {
-      // No network: keep the blob in per-employee IndexedDB; replay uploads it
-      // before the complete action (upload-then-act) and survives reload.
+      // No network: staged-запись уже в IDB; replay зальёт её позже (upload-then-act).
       try {
         setPhotoError(null);
-        const rec = await saveOfflinePhoto(photoUserId, file, kind, file.name);
         let url: string | undefined;
         try {
           if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-            url = URL.createObjectURL(file);
+            url = URL.createObjectURL(staged);
           }
         } catch {
           /* preview optional */
         }
-        if (url) setOfflinePreviewUrls((p) => ({ ...p, [rec.localId]: url }));
+        if (url) setOfflinePreviewUrls((p) => ({ ...p, [stagedLocalId]: url }));
         const limit = photoLimitFor(kind);
         setPendingOfflinePhotos((p) =>
           p.filter((item) => item.kind === kind).length >= limit
             ? p
-            : [...p, { localId: rec.localId, kind: rec.kind }],
+            : [...p, { localId: stagedLocalId, kind }],
         );
         if (kind === 'after') setAfterDone(true);
         setFailedPhoto(null);
       } catch (e) {
         setPhotoError(
-          `${toLocalizedError(e).message} (${describePhotoFailure(file, startedAt, e)})`,
+          `${toLocalizedError(e).message} (${describePhotoFailure(staged, startedAt, e)})`,
         );
         setFailedPhoto({ file, kind });
+        await cleanupStaged();
       }
       return;
     }
     try {
       setPhotoError(null);
       setAfterPct(0);
-      await uploadPhoto(file, kind, id, setAfterPct);
+      await uploadPhoto(staged, kind, id, setAfterPct);
       setAfterPct(100);
       if (kind === 'after') setAfterDone(true);
       setFailedPhoto(null);
       invalidate();
       void orderPhotos.refetch();
+      await cleanupStaged();
     } catch (e) {
       setAfterPct(null);
-      setPhotoError(`${toLocalizedError(e).message} (${describePhotoFailure(file, startedAt, e)})`);
+      setPhotoError(
+        `${toLocalizedError(e).message} (${describePhotoFailure(staged, startedAt, e)})`,
+      );
       setFailedPhoto({ file, kind });
+      await cleanupStaged();
     }
   };
 

@@ -1,5 +1,6 @@
 import { api } from '../lib/api-client';
 import { readWithSnapshot } from '../lib/snapshot-cache';
+import type { OfflinePhotoSource } from '../lib/offline-photos';
 
 export type PhotoKind = 'before' | 'after';
 
@@ -67,6 +68,31 @@ export async function ensureFileReadable(file: Blob): Promise<void> {
       'PHOTO_FILE_UNREADABLE: файл недоступен на устройстве — выберите другой или снимите заново',
     );
   }
+}
+
+/** Staged-загрузка: байты СРАЗУ в IndexedDB, всё остальное — из копии.
+ *  Оригинальный File-хендл из системного пикера может умереть (фон, отзыв
+ *  гранта) — IDB-копия same-origin и читается всегда. Возвращает staged File
+ *  (только из IDB-байтов), localId и функцию чистки после успеха. */
+export async function stagePhotoForUpload(
+  save: (file: File | Blob) => Promise<{ localId: string; data?: unknown }>,
+  readBack: (localId: string) => Promise<Blob | null>,
+  cleanup: (localId: string) => Promise<void>,
+  file: File,
+): Promise<{ staged: File; localId: string; cleanup: () => Promise<void> }> {
+  const rec = await save(file);
+  const bytes = await readBack(rec.localId);
+  if (!bytes) {
+    await cleanup(rec.localId).catch(() => {});
+    throw new Error(
+      'PHOTO_FILE_UNREADABLE: файл недоступен на устройстве — выберите другой или снимите заново',
+    );
+  }
+  const staged =
+    bytes instanceof File
+      ? bytes
+      : new File([bytes], file.name || 'photo.jpg', { type: bytes.type || file.type });
+  return { staged, localId: rec.localId, cleanup: () => cleanup(rec.localId) };
 }
 
 /** Read JPEG EXIF DateTimeOriginal before canvas compression strips the metadata. */
@@ -190,7 +216,19 @@ export async function uploadPhoto(
 }
 
 /** Диагностика неуспешной загрузки: размер, длительность, код — для поля боя с каналом. */
-export function describePhotoFailure(file: Blob, startedAt: number, err: unknown): string {
+export function photoSourceLabel(source?: OfflinePhotoSource): string | undefined {
+  if (source === 'camera') return 'источник: камера (запрошен режим съёмки)';
+  if (source === 'picker')
+    return 'источник: системный выбор (галерея/файлы/SD не различаются)';
+  return undefined;
+}
+
+export function describePhotoFailure(
+  file: Blob,
+  startedAt: number,
+  err: unknown,
+  source?: OfflinePhotoSource,
+): string {
   const kb = Math.max(1, Math.round(file.size / 1024));
   const secs = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
   const code =
@@ -200,7 +238,8 @@ export function describePhotoFailure(file: Blob, startedAt: number, err: unknown
       ? String((err as { response?: { status?: unknown } }).response?.status ?? '')
       : '';
   const tech = [code, status && `HTTP ${status}`].filter(Boolean).join(' ');
-  return `${kb} КБ / ${secs} с${tech ? ` [${tech}]` : ''}`;
+  const origin = photoSourceLabel(source);
+  return `${kb} КБ / ${secs} с${tech ? ` [${tech}]` : ''}${origin ? ` · ${origin}` : ''}`;
 }
 
 export async function photoUrl(photoId: string): Promise<string> {

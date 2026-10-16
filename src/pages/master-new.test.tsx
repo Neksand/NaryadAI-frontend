@@ -21,7 +21,8 @@ const apiGetMock = vi.hoisted(() => vi.fn(async () => ({ data: [] })));
 vi.mock('../api/workOrders', () => woMocks);
 vi.mock('../api/ai', () => ({ suggestAssignee: aiMock }));
 vi.mock('../api/misc', () => ({ catalogList: miscMock }));
-vi.mock('../api/photos', () => ({ uploadPhoto: uploadMock, describePhotoFailure: () => 'diag', ensureFileReadable: async () => {} }));
+vi.mock('../api/photos', () => ({ uploadPhoto: uploadMock, describePhotoFailure: () => 'diag', ensureFileReadable: async () => {}, photoSourceLabel: () => 'source' }));
+vi.mock('../lib/offline-photos', () => ({ saveOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before' }), getOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before', name: 'a.jpg', type: 'image/jpeg', data: new Blob(['img'], { type: 'image/jpeg' }) }), readStagedFile: async () => null, addOfflinePhotoDraftRef: async () => {}, listOfflinePhotoDraftRefs: async () => [], removeOfflinePhotoDraftRefs: async () => {}, removeOfflinePhotos: async () => {} }));
 vi.mock('../hooks/useWS', () => ({
   useRealtime: () => ({ status: 'closed', reconnected: false }),
 }));
@@ -181,6 +182,7 @@ describe('MasterNew AI and photo', () => {
     const u = userEvent.setup();
     renderNew();
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await waitFor(() => expect(input).toBeEnabled());
     const file = new File(['img'], 'a.jpg', { type: 'image/jpeg' });
     await u.upload(input, file);
     await waitFor(() => expect(uploadMock).toHaveBeenCalled());
@@ -218,6 +220,7 @@ describe('MasterNew AI and photo', () => {
     uploadMock.mockRejectedValueOnce(new Error('too big'));
     renderNew();
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await waitFor(() => expect(input).toBeEnabled());
     await u.upload(input, new File(['img'], 'a.jpg', { type: 'image/jpeg' }));
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
   });
