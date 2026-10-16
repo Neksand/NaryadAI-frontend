@@ -74,7 +74,7 @@ export default function MasterBoard() {
     <Shell title={t('nav.board')} tabs={roleTabs(t, 'master')}>
       <div className="flex gap-2 flex-wrap" role="search">
         <select
-          className="input !w-auto !min-h-[40px]"
+          className="input !w-auto !min-h-[44px]"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
           aria-label={t('master.ordersTitle')}
@@ -96,7 +96,7 @@ export default function MasterBoard() {
             </option>
           ))}
         </select>
-        <Link to="/master/new" className="btn btn-primary btn-sm">
+        <Link to="/master/new" className="btn btn-primary btn-sm tap-44">
           + {t('master.newOrder')}
         </Link>
         {q.data?.next_cursor && <span className="chip neutral">{t('common.next')}</span>}
@@ -109,7 +109,7 @@ export default function MasterBoard() {
       ) : q.isError ? (
         <ErrorState message={toLocalizedError(q.error).message} onRetry={() => q.refetch()} />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="card-list">
           {COLS.map((c) => (
             <section
               key={c.key}
@@ -120,7 +120,7 @@ export default function MasterBoard() {
                 type="button"
                 onClick={() => toggle(c.key)}
                 aria-expanded={isOpen(c.key)}
-                className="flex items-center gap-2 w-full text-left font-bold text-sm"
+                className="flex items-center gap-2 w-full text-left font-bold text-sm min-h-[44px]"
               >
                 <Icon name={isOpen(c.key) ? 'chevD' : 'chevU'} size={18} />
                 <span>

@@ -79,11 +79,11 @@ function InsightCard({
   });
   return (
     <div className="card flex flex-col gap-2">
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-center min-w-0">
         <span className={`chip ${ins.severity === 'critical' ? 'danger' : 'warn'}`}>
           {t(`severity.${ins.severity ?? 'info'}`, ins.severity ?? 'info')}
         </span>
-        <b>
+        <b className="min-w-0 wrap-anywhere">
           {lang === 'kk'
             ? ins.headline_kk || ins.headline || ins.title || ins.id
             : ins.headline || ins.title || ins.id}
@@ -121,7 +121,7 @@ function InsightCard({
             ))}
           </select>
           <button
-            className="btn btn-sm btn-ai"
+            className="btn btn-sm btn-ai tap-44"
             disabled={!assignee || plan.isPending}
             onClick={() => plan.mutate()}
           >
@@ -185,7 +185,7 @@ function SectionTable({ data, linkPrefix }: { data: unknown; linkPrefix?: string
     .slice(0, 6);
   const idKey = ['id', 'area_id', 'employee_id', 'equipment_id'].find((k) => k in (rows[0] ?? {}));
   return (
-    <div className="card overflow-x-auto">
+    <div className="card overflow-x-auto wrap-anywhere">
       <table className="tbl">
         <thead>
           <tr>
@@ -365,7 +365,7 @@ export function ReportExportPanel() {
           <span role="status">{t('reports.processing')}</span>
         )}
         {status.data?.status === 'completed' && status.data.url && (
-          <a className="btn btn-sm" href={status.data.url} target="_blank" rel="noreferrer">
+          <a className="btn btn-sm tap-44" href={status.data.url} target="_blank" rel="noreferrer">
             {t('reports.download')}
           </a>
         )}
@@ -383,7 +383,7 @@ export function ReportExportPanel() {
           </span>
         )}
         {statusError && (
-          <button type="button" className="btn btn-sm" onClick={() => void status.refetch()}>
+          <button type="button" className="btn btn-sm tap-44" onClick={() => void status.refetch()}>
             {t('common.retry')}
           </button>
         )}
@@ -393,7 +393,7 @@ export function ReportExportPanel() {
           </span>
         )}
         {create.isError && (
-          <button type="button" className="btn btn-sm" onClick={() => create.mutate()}>
+          <button type="button" className="btn btn-sm tap-44" onClick={() => create.mutate()}>
             {t('common.retry')}
           </button>
         )}
@@ -464,7 +464,7 @@ export default function ManagerDashboard() {
             key={x.key}
             role="tab"
             aria-selected={tab === x.key}
-            className={`btn btn-sm ${tab === x.key ? 'btn-primary' : ''}`}
+            className={`btn btn-sm tap-44 ${tab === x.key ? 'btn-primary' : ''}`}
             onClick={() => setTab(x.key)}
           >
             {t(x.labelKey)}
@@ -557,7 +557,7 @@ export default function ManagerDashboard() {
             ) : insightItems.length === 0 ? (
               <div className="card text-[var(--ink-muted)]">{t('common.empty')}</div>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="card-list">
                 {insightItems.slice(0, 6).map((ins) => (
                   <InsightCard key={ins.id} ins={ins} lang={lang} workers={workers.data ?? []} />
                 ))}
@@ -582,7 +582,7 @@ export default function ManagerDashboard() {
                   <p className="text-sm text-[var(--ink-muted)] mb-3">
                     {t('analytics.ratingExplanation')}
                   </p>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto wrap-anywhere">
                     <table className="tbl">
                       <thead>
                         <tr>
@@ -599,7 +599,7 @@ export default function ManagerDashboard() {
                       <tbody>
                         {ratingItems.slice(0, 10).map((r) => (
                           <tr key={r.id}>
-                            <td data-label={t('analytics.employee')}>
+                            <td data-label={t('analytics.employee')} className="wrap-anywhere">
                               {r.name ?? r.id.slice(0, 8)}
                               {r.low_data && (
                                 <span className="chip warn ml-2">{t('metric.low_data')}</span>
@@ -634,7 +634,7 @@ export default function ManagerDashboard() {
                 </>
               )}
             </div>
-            <Link to="/manager/areas" className="btn btn-sm mt-2">
+            <Link to="/manager/areas" className="btn btn-sm tap-44 mt-2">
               {t('analytics.areasLink')}
             </Link>
           </section>

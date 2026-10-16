@@ -838,3 +838,53 @@ body {
   line-height: 1;
   padding: 12px 10px;
 }
+
+/* ---- Mobile spacing/tap pass (320/390px): только отступы и тап-зоны, без редизайна ---- */
+.tap-44 {
+  min-height: 44px;
+  min-width: 44px;
+}
+.wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+/* Единый ритм карточных списков: 12px, как gap-3 в карточках. */
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+/* Липкие шапки (таблицы/tabbar) не перекрывают якорный контент. */
+section[aria-label] {
+  scroll-margin-top: 8px;
+  scroll-margin-bottom: 8px;
+}
+
+@media (max-width: 480px) {
+  /* Тапы <44px дотягиваем до 44px только на телефоне; десктоп без изменений. */
+  .btn-sm {
+    min-height: 44px;
+  }
+  .fchip {
+    min-height: 44px;
+  }
+  .lang-select {
+    min-height: 44px;
+  }
+  .tab-toggle {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Длинные слова/номера переносятся вместо распирания вьюпорта. */
+  .card,
+  .banner,
+  .kpi {
+    overflow-wrap: anywhere;
+  }
+  /* Страховка от горизонтального скролла; clip (не hidden) сохраняет sticky. */
+  main {
+    overflow-x: clip;
+  }
+}

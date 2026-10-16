@@ -111,18 +111,18 @@ export default function WorkerHome() {
       )}
       {newOrder && (
         <div className="banner banner-ai flex items-center gap-2" role="status">
-          <span className="flex-1">
+          <span className="flex-1 min-w-0 wrap-anywhere">
             {t('worker.newOrder', { number: newOrder.number ?? newOrder.id.slice(0, 8) })}
           </span>
           <Link
-            className="btn btn-sm btn-primary"
+            className="btn btn-sm btn-primary tap-44"
             to={`/worker/orders/${newOrder.id}`}
             onClick={() => setNewOrder(null)}
           >
             {t('worker.openOrder')}
           </Link>
           <button
-            className="btn btn-sm"
+            className="btn btn-sm tap-44"
             type="button"
             aria-label={t('common.close')}
             onClick={() => setNewOrder(null)}
@@ -180,7 +180,7 @@ export default function WorkerHome() {
         ) : visible.length === 0 ? (
           <EmptyState text={t('common.empty')} />
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="card-list">
             {visible.map((o) => (
               <WorkerOrderCard
                 key={o.id}
@@ -209,7 +209,7 @@ export default function WorkerHome() {
           <EmptyState text={t('common.empty')} />
         ) : (
           <>
-            <div className="flex flex-col gap-3">
+            <div className="card-list">
               {(history.data ?? []).slice(0, historyShown).map((o) => (
                 <OrderCard key={o.id} order={o} to={`/worker/orders/${o.id}`} />
               ))}
@@ -217,7 +217,7 @@ export default function WorkerHome() {
             {(history.data ?? []).length > historyShown && (
               <button
                 type="button"
-                className="btn btn-sm mt-2 self-center"
+                className="btn btn-sm tap-44 mt-2 self-center"
                 onClick={() => setHistoryShown((n) => n + HISTORY_PAGE)}
               >
                 {t('common.more')} ({(history.data ?? []).length - historyShown})
