@@ -79,6 +79,7 @@ export default function MasterNew() {
     | null
   >(null);
   const photoBusyRef = useRef(false);
+  const draftKeyRef = useRef<string | null>(null);
   const previewUrlsRef = useRef<Record<string, string>>({});
   const [photosHydrated, setPhotosHydrated] = useState(false);
   // Offline draft photos: blobs in per-employee IndexedDB, uploaded before create.
@@ -134,6 +135,10 @@ export default function MasterNew() {
   const create = useMutation({
     networkMode: 'always',
     mutationFn: async () => {
+      // Ключ стабилен на черновик: повтор после обрыва — replay того же
+      // наряда, а не дубликат с конфликтом photo_ids.
+      if (!draftKeyRef.current) draftKeyRef.current = newUUID();
+      const key = draftKeyRef.current;
       const payload = {
         // area_id бэкенд не принимает (участок выводится из оборудования) — только обязательные поля CreateWO.
         // due_at уже ISO из DateTimeField (дд.мм.гггг, чч:мм), повторно не парсим.
@@ -154,7 +159,6 @@ export default function MasterNew() {
       // Offline draft with photos: persist blobs per-employee, enqueue one
       // idempotent create; replay uploads photos first (upload-then-act).
       if (pendingLocalPhotos.length > 0) {
-        const key = newUUID();
         await offline.enqueue({
           key,
           orderId: 'new',
@@ -183,7 +187,6 @@ export default function MasterNew() {
         return { queued: true as const };
       }
       if (isOffline) {
-        const key = newUUID();
         await offline.enqueue({
           key,
           orderId: 'new',
@@ -194,9 +197,10 @@ export default function MasterNew() {
         });
         return { queued: true as const };
       }
-      return createWorkOrder(payload, newUUID());
+      return createWorkOrder(payload, key);
     },
     onSuccess: (order) => {
+      draftKeyRef.current = null;
       if ((order as { queued?: boolean } | undefined)?.queued) {
         setDraftQueued(true);
         return;
@@ -204,6 +208,18 @@ export default function MasterNew() {
       nav(`/master/orders/${(order as { id: string }).id}`);
     },
   });
+
+  /** Первое поле из details[] ответа валидации бэкенда — вместо голого «проверьте данные». */
+  function firstValidationDetail(err: unknown): string | null {
+    if (typeof err !== 'object' || err === null) return null;
+    const data = (err as { response?: { data?: unknown } }).response?.data;
+    if (typeof data !== 'object' || data === null) return null;
+    const details = (data as { error?: { details?: unknown } }).error?.details;
+    if (!Array.isArray(details) || !details.length) return null;
+    const first = details[0] as { path?: unknown; message?: unknown };
+    const where = typeof first.path === 'string' && first.path ? `${first.path}: ` : '';
+    return typeof first.message === 'string' && first.message ? `${where}${first.message}` : null;
+  }
 
   const totalPhotos = photoIds.length + pendingLocalPhotos.length;
   const isPhotoLimitReached = totalPhotos >= BEFORE_LIMIT;
@@ -523,6 +539,7 @@ export default function MasterNew() {
 
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const err = create.isError ? toLocalizedError(create.error) : null;
+  const errDetail = create.isError ? firstValidationDetail(create.error) : null;
 
   return (
     <Shell title={t('master.newOrder')} tabs={roleTabs(t, 'master')}>
@@ -957,7 +974,7 @@ export default function MasterNew() {
             {t('common.offline')} · {t('common.queued')}
           </div>
         )}
-        {err && <ErrorState message={err.message} />}
+        {err && <ErrorState message={errDetail ? `${err.message}: ${errDetail}` : err.message} />}
         <button
           className="btn btn-primary btn-xl btn-block"
           disabled={!canSubmit}

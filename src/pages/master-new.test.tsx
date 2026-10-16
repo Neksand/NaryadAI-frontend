@@ -21,8 +21,27 @@ const apiGetMock = vi.hoisted(() => vi.fn(async () => ({ data: [] })));
 vi.mock('../api/workOrders', () => woMocks);
 vi.mock('../api/ai', () => ({ suggestAssignee: aiMock }));
 vi.mock('../api/misc', () => ({ catalogList: miscMock }));
-vi.mock('../api/photos', () => ({ uploadPhoto: uploadMock, describePhotoFailure: () => 'diag', ensureFileReadable: async () => {}, photoSourceLabel: () => 'source' }));
-vi.mock('../lib/offline-photos', () => ({ saveOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before' }), getOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before', name: 'a.jpg', type: 'image/jpeg', data: new Blob(['img'], { type: 'image/jpeg' }) }), readStagedFile: async () => null, addOfflinePhotoDraftRef: async () => {}, listOfflinePhotoDraftRefs: async () => [], removeOfflinePhotoDraftRefs: async () => {}, removeOfflinePhotos: async () => {} }));
+vi.mock('../api/photos', () => ({
+  uploadPhoto: uploadMock,
+  describePhotoFailure: () => 'diag',
+  ensureFileReadable: async () => {},
+  photoSourceLabel: () => 'source',
+}));
+vi.mock('../lib/offline-photos', () => ({
+  saveOfflinePhoto: async () => ({ localId: 'loc1', kind: 'before' }),
+  getOfflinePhoto: async () => ({
+    localId: 'loc1',
+    kind: 'before',
+    name: 'a.jpg',
+    type: 'image/jpeg',
+    data: new Blob(['img'], { type: 'image/jpeg' }),
+  }),
+  readStagedFile: async () => null,
+  addOfflinePhotoDraftRef: async () => {},
+  listOfflinePhotoDraftRefs: async () => [],
+  removeOfflinePhotoDraftRefs: async () => {},
+  removeOfflinePhotos: async () => {},
+}));
 vi.mock('../hooks/useWS', () => ({
   useRealtime: () => ({ status: 'closed', reconnected: false }),
 }));
@@ -112,6 +131,38 @@ describe('MasterNew kind and validation', () => {
       ),
     );
     expect(screen.getByText('ORDER_CREATED')).toBeTruthy();
+  });
+
+  it('reuses the draft key on retry so a lost response replays instead of duplicating', async () => {
+    const u = userEvent.setup();
+    woMocks.createWorkOrder.mockRejectedValueOnce(new Error('response lost'));
+    renderNew();
+    await fillValid(u);
+    const submit = screen.getByRole('button', { name: 'Новый наряд' });
+    await waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(false));
+    await u.click(submit);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    const firstKey = woMocks.createWorkOrder.mock.calls[0][1] as string;
+    expect(firstKey).toBeTruthy();
+    woMocks.createWorkOrder.mockResolvedValueOnce({ id: 'n9', replayed: true });
+    await u.click(submit);
+    await waitFor(() => expect(woMocks.createWorkOrder).toHaveBeenCalledTimes(2));
+    expect(woMocks.createWorkOrder.mock.calls[1][1]).toBe(firstKey);
+  });
+
+  it('shows the first backend validation detail', async () => {
+    const u = userEvent.setup();
+    woMocks.createWorkOrder.mockRejectedValueOnce({
+      response: {
+        data: {
+          error: { details: [{ path: 'photo_ids', message: 'Фото уже связано' }] },
+        },
+      },
+    });
+    renderNew();
+    await fillValid(u);
+    await u.click(screen.getByRole('button', { name: 'Новый наряд' }));
+    await waitFor(() => expect(screen.getByText(/Фото уже связано/)).toBeTruthy());
   });
 
   it('shows backend error', async () => {
