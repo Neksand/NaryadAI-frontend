@@ -902,6 +902,24 @@ export default function MasterNew() {
                 }}
               />
             </label>
+            <label className="file-btn">
+              <Icon name="camera" size={22} /> {t('master.photoCamera', 'Снять фото')}
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*"
+                capture="environment"
+                aria-label={t('master.photoCamera', 'Снять фото')}
+                disabled={uploadingPhoto || isPhotoLimitReached || !photosHydrated}
+                title={isPhotoLimitReached ? photoLimitHint : undefined}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  void handlePhotoFile(f, 'camera');
+                }}
+              />
+            </label>
           </div>
           <span className="text-xs opacity-70">
             {t(

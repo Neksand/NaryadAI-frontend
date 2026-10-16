@@ -754,6 +754,27 @@ export default function WorkerOrder() {
                     }}
                   />
                 </label>
+                <label className="file-btn">
+                  <Icon name="camera" size={22} /> {t('worker.photoCamera', 'Снять фото')}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    capture="environment"
+                    aria-label={t('worker.photoCamera', 'Снять фото')}
+                    disabled={uploadingAfter || isAfterLimitReached}
+                    title={
+                      isAfterLimitReached
+                        ? t('worker.photoLimit', 'Достигнут лимит: максимум 10 фото')
+                        : undefined
+                    }
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      if (f) void onPhoto(f, 'after');
+                    }}
+                  />
+                </label>
               </div>
               {isAfterLimitReached && (
                 <span role="note" className="text-sm opacity-70">

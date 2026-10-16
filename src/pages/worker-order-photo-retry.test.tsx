@@ -143,7 +143,7 @@ describe('WorkerOrder photo retry', () => {
     await openComplete(u);
     expect(await screen.findByText('Фото 10 из 10')).toBeTruthy();
     const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
-    expect(screen.queryByLabelText('Снять фото')).toBeNull();
+    expect(screen.getByLabelText('Снять фото')).toHaveAttribute('capture', 'environment');
     expect(picker.disabled).toBe(true);
     expect(await screen.findByRole('note')).toBeTruthy();
     // Лимит не пускает в сеть

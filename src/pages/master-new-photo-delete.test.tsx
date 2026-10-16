@@ -105,12 +105,13 @@ beforeEach(() => {
 });
 
 describe('MasterNew photo pickers', () => {
-  it('renders a single system picker without capture split', async () => {
+  it('renders system picker plus direct camera button', async () => {
     renderNew();
     const picker = await screen.findByLabelText('Выбрать фото');
     expect(picker).toHaveAttribute('accept', 'image/*');
     expect(picker).not.toHaveAttribute('capture');
-    expect(screen.queryByLabelText('Снять фото')).toBeNull();
+    const camera = await screen.findByLabelText('Снять фото');
+    expect(camera.getAttribute('capture')).toBe('environment');
     expect(screen.getByText('Выбрать фото')).toBeTruthy();
   });
 });

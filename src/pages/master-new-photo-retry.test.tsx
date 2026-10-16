@@ -221,7 +221,7 @@ describe('MasterNew photo retry', () => {
     expect(await screen.findByText('Фото 5 из 5')).toBeTruthy();
     // input дизейблится с подсказкой
     const picker = (await screen.findByLabelText('Выбрать фото')) as HTMLInputElement;
-    expect(screen.queryByLabelText('Снять фото')).toBeNull();
+    expect(screen.getByLabelText('Снять фото')).toHaveAttribute('capture', 'environment');
     expect(picker).not.toHaveAttribute('capture');
     expect(picker.disabled).toBe(true);
     expect(await screen.findByRole('note')).toBeTruthy();

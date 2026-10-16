@@ -121,7 +121,9 @@ describe('WorkerOrder photo pickers', () => {
     const picker = await screen.findByLabelText('Выбрать фото');
     expect(picker).toHaveAttribute('accept', 'image/*');
     expect(picker).not.toHaveAttribute('capture');
-    expect(screen.queryByLabelText('Снять фото')).toBeNull();
+    expect((await screen.findByLabelText('Снять фото')).getAttribute('capture')).toBe(
+      'environment',
+    );
   });
 });
 
